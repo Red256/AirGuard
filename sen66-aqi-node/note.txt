@@ -1,0 +1,270 @@
+US AQI COLOUR NOTES - SEN66 + Boron + 25x WS2812B strip
+Date: 2026-10-10
+Firmware: aqi_node/src/sen66_aqi.cpp
+Authority: EPA AQS breakpoint table (aqi_breakpoints.csv), AirNow "AQI Basics"
+Breakpoints current as of: PM2.5 revision effective 2024-05-06
+
+
+1. WHAT THE STRIP IS SHOWING
+----------------------------
+All 25 LEDs show one solid colour. The colour is the US EPA Air Quality Index
+category for the particulate reading coming off the SEN66.
+
+It is NOT a bar graph and NOT a direct map of ug/m3 to colour. The chain is:
+
+  PM concentration (ug/m3)  ->  AQI number (0-500)  ->  category  ->  colour
+
+The AQI number is the thing with the official definition. The colour is just a
+lookup on which of the six category bands the number landed in.
+
+
+2. THE SIX CATEGORIES
+---------------------
+Colours are AirNow's published category hex values, used unmodified.
+
+  AQI        Category                        Colour   Hex      RGB
+  ---------  ------------------------------  -------  -------  -------------
+    0 -  50  Good                            green    #00E400  (0, 228, 0)
+   51 - 100  Moderate                        yellow   #FFFF00  (255, 255, 0)
+  101 - 150  Unhealthy for Sensitive Groups  orange   #FF7E00  (255, 126, 0)
+  151 - 200  Unhealthy                       red      #FF0000  (255, 0, 0)
+  201 - 300  Very Unhealthy                  purple   #8F3F97  (143, 63, 151)
+  301 - 500  Hazardous                       maroon   #7E0023  (126, 0, 35)
+
+  (no PM reading yet)                        dim white         (60, 60, 60)
+
+Note the bands are NOT equal widths in AQI. The first four are 50 wide, "Very
+Unhealthy" is 100 wide and "Hazardous" is 200 wide. That is deliberate - the
+index is built so that 100 always means "at the national health standard" for
+whichever pollutant you are measuring, and everything else follows from that.
+
+Why purple and maroon look wrong on the strip: both are dark, low-brightness
+colours by design, and at 10 % brightness maroon is very dim. That is correct
+behaviour, not a fault. If you need those two to read better in a bright room,
+raise brightness with the ledBright cloud function rather than changing the
+hex values - they are the official ones.
+
+
+3. PM2.5 BREAKPOINTS (24-hour, ug/m3)
+-------------------------------------
+This is the table EPA revised on 2024-05-06, when the annual PM2.5 standard
+went from 12.0 to 9.0 ug/m3.
+
+  AQI        Concentration     Category
+  ---------  ----------------  ------------------------------
+    0 -  50    0.0 -    9.0    Good
+   51 - 100    9.1 -   35.4    Moderate
+  101 - 150   35.5 -   55.4    Unhealthy for Sensitive Groups
+  151 - 200   55.5 -  125.4    Unhealthy
+  201 - 300  125.5 -  225.4    Very Unhealthy
+  301 - 500  225.5 -  325.4    Hazardous
+
+WHAT CHANGED IN 2024 - this matters if you compare against older code or a
+different app, because a lot of software still ships the old table:
+
+  Category        Old breakpoints   New breakpoints
+  --------------  ----------------  ----------------
+  Good            0.0  -  12.0      0.0  -   9.0     <- tightened
+  Moderate        12.1 -  35.4      9.1  -  35.4     <- floor moved down
+  USG             35.5 -  55.4      35.5 -  55.4     unchanged
+  Unhealthy       55.5 - 150.4      55.5 - 125.4     <- tightened
+  Very Unhealthy  150.5 - 250.4    125.5 - 225.4     <- tightened
+  Hazardous       250.5 +          225.5 +           <- tightened
+
+Practical consequence: a 10.5 ug/m3 reading used to be green and is now
+yellow. If this node disagrees with an older monitor by exactly one category
+in the green/yellow region, this is why.
+
+
+4. PM10 BREAKPOINTS (24-hour, ug/m3)
+------------------------------------
+Unchanged by the 2024 revision.
+
+  AQI        Concentration   Category
+  ---------  --------------  ------------------------------
+    0 -  50    0 -   54      Good
+   51 - 100   55 -  154      Moderate
+  101 - 150  155 -  254      Unhealthy for Sensitive Groups
+  151 - 200  255 -  354      Unhealthy
+  201 - 300  355 -  424      Very Unhealthy
+  301 - 500  425 -  604      Hazardous
+
+
+5. HOW A CONCENTRATION BECOMES AN AQI NUMBER
+--------------------------------------------
+Linear interpolation inside whichever band contains the concentration:
+
+              iHi - iLo
+      I  =  -------------  x  ( C - cLo )  +  iLo
+              cHi - cLo
+
+  C    = the measured concentration
+  cLo  = low concentration breakpoint of the band containing C
+  cHi  = high concentration breakpoint of that band
+  iLo  = low AQI value of that band
+  iHi  = high AQI value of that band
+  I    = AQI, rounded to the nearest whole number
+
+Before the lookup, truncate (not round) the concentration:
+  PM2.5 -> 1 decimal place
+  PM10  -> whole number
+
+The truncation is load-bearing. It is what closes the apparent gaps between
+bands - PM2.5 of 9.05 truncates to 9.0 and stays Good; 35.49 truncates to 35.4
+and stays Moderate. Round-to-nearest would push both up a category.
+
+WORKED EXAMPLE - PM2.5 = 12.0 ug/m3
+  12.0 falls in the Moderate band: cLo 9.1, cHi 35.4, iLo 51, iHi 100
+
+      I = (100 - 51) / (35.4 - 9.1) x (12.0 - 9.1) + 51
+        = 49 / 26.3 x 2.9 + 51
+        = 1.863 x 2.9 + 51
+        = 5.40 + 51
+        = 56.4  ->  56
+
+  AQI 56 -> Moderate -> YELLOW.
+  (Under the pre-2024 table this same 12.0 was AQI 50, Good, green.)
+
+WORKED EXAMPLE - PM2.5 = 40.0 ug/m3
+  40.0 falls in the USG band: cLo 35.5, cHi 55.4, iLo 101, iHi 150
+
+      I = (150 - 101) / (55.4 - 35.5) x (40.0 - 35.5) + 101
+        = 49 / 19.9 x 4.5 + 101
+        = 2.462 x 4.5 + 101
+        = 11.08 + 101
+        = 112.1  ->  112
+
+  AQI 112 -> Unhealthy for Sensitive Groups -> ORANGE.
+
+Above the top of the table the firmware clamps to 500. EPA does publish
+"beyond the AQI" extensions past 500, but they are not part of the public
+index and nothing consumer-facing reports them.
+
+
+6. OVERALL AQI = THE WORST POLLUTANT, NOT THE AVERAGE
+-----------------------------------------------------
+EPA computes a sub-index for every pollutant it has data for, then reports the
+MAXIMUM. The reported AQI is always "how bad is the single worst thing in the
+air", and the pollutant that produced it is the "responsible" or "driver"
+pollutant.
+
+This firmware has two particulate channels, so:
+
+      AQI = max( subIndex_PM2.5 , subIndex_PM10 )
+
+Example: PM2.5 = 8.0 (sub-index 44) with PM10 = 300 (sub-index 173) reports
+AQI 173, Unhealthy, red - driven by PM10. Averaging the two would have given
+~109 and shown orange, which would be wrong.
+
+In practice indoor PM2.5 almost always dominates, so PM10 rarely drives the
+colour. The serial log prints which one did, as "(driver PM25)" or
+"(driver PM10)".
+
+NOT INCLUDED: CO2, VOC index and NOx index are still measured, logged and
+published, but they do not feed the AQI. CO2 is not an AQI pollutant at all,
+and the Sensirion VOC/NOx indices are relative 1-500 scales of their own with
+no EPA breakpoint table. The other four real AQI pollutants - ozone, CO, SO2,
+NO2 - need sensors this node does not have. So this is a particulate-only AQI,
+which is the honest description of it.
+
+
+7. THE 24-HOUR PROBLEM, AND WHAT THE FIRMWARE DOES ABOUT IT
+-----------------------------------------------------------
+Every breakpoint above is defined against a 24-HOUR AVERAGE concentration. The
+SEN66 reports a near-instantaneous value once per second. Feeding a 1 Hz
+reading into a 24-hour table is not what the table means.
+
+Nobody waits a day for a colour, so there are three options:
+
+  (a) Use the instant reading anyway. What most cheap consumer monitors do.
+      Very responsive, very twitchy - lighting a candle or walking past the
+      intake swings it two categories for thirty seconds.
+
+  (b) NowCast. EPA's own method for sub-daily reporting. Weighted average of
+      the last 12 hourly averages, where the weight decays faster when the air
+      is changing quickly, so it reacts fast to a wildfire plume but stays
+      stable in steady air. This is what AirNow shows you.
+
+  (c) A plain moving average. Most of the stability of NowCast, a few lines of
+      code, needs no hourly history buffer.
+
+This firmware does (c): an exponential moving average on the PM concentrations
+with a time constant of about 5 minutes, set by AQI_EMA_TAU_S. The AQI and the
+colour are computed from the smoothed concentrations.
+
+  Smoothed value published as ... "aqi",    cloud variable "aqi"
+  Instant value published as .... "aqiRaw", cloud variable "aqiRaw"
+  Category string ............... "aqiCat", cloud variable "aqiCat"
+
+Both numbers go out in every event, so the raw signal is never lost - the
+smoothing only affects what the LEDs show.
+
+To switch the strip to the instantaneous value:
+
+      particle call banjo_spark aqiSmooth 0     # instant
+      particle call banjo_spark aqiSmooth 1     # smoothed (default)
+
+Side effect worth knowing: for the first few minutes after boot the EMA is
+still converging from its first sample, so the colour can be optimistic. The
+dim-white "no reading" state only covers the window before the first PM
+sample arrives, not the EMA settling time.
+
+
+8. WHERE THE TABLES LIVE IN THE CODE
+------------------------------------
+  aqi_node/src/sen66_aqi.cpp
+
+    AQI_PM25[]         PM2.5 breakpoints, section 3 above
+    AQI_PM10[]         PM10 breakpoints, section 4 above
+    AQI_CATEGORIES[]   AQI range -> RGB + label, section 2 above
+    AQI_UNKNOWN        dim white, shown before the first PM reading
+    subIndex()         the section 5 formula, with EPA truncation
+    overallAqi()       the section 6 maximum
+    updateEma()        the section 7 smoothing
+    updateIndicator()  picks the category and repaints the strip
+
+All six AQI_CATEGORIES entries use an inclusive maxAqi, and the last entry is
+the catch-all. Same shape as the CO2_BANDS[] table in the original
+src/sen66_boron.cpp, so the two are easy to diff.
+
+The strip only re-clocks when the CATEGORY changes, not when the AQI number
+changes. A reading drifting from 44 to 47 sends no new data to the strip.
+
+
+9. CAVEATS ON THE MEASUREMENT ITSELF
+------------------------------------
+- The SEN66 is an optical scattering sensor (nephelometer). EPA breakpoints
+  are defined against gravimetric reference methods - filter weighing. An
+  optical sensor infers mass from scattered light, and the inference depends
+  on particle size distribution, composition and refractive index. Expect
+  agreement in category, not in digits, versus a regulatory monitor.
+
+- Optical PM sensors read high at high humidity, because water uptake makes
+  particles grow and scatter more. Above roughly 75 %RH, treat the readings as
+  an upper bound. The SEN66 reports RH in the same payload, so a suspicious
+  PM spike can be checked against it.
+
+- PM10 from this class of sensor is the weakest channel. Scattering sensors
+  undercount coarse particles because larger particles are poorly sampled by
+  the inlet. If PM10 ever drives the colour, be suspicious before believing
+  it.
+
+- Indoor AQI is not a regulatory concept. AQI is defined for outdoor ambient
+  air. Applying it to a room is useful and conventional, but it is not what
+  the index was designed for, and there is no indoor standard it maps to.
+
+
+10. EYEBALL REFERENCE
+---------------------
+Rough PM2.5 values and what colour the strip will be, assuming PM2.5 drives:
+
+      0 -   9 ug/m3   green    clean indoor air
+     10 -  35 ug/m3   yellow   cooking, candles, a dusty room
+     36 -  55 ug/m3   orange   heavy cooking, nearby smoke
+     56 - 125 ug/m3   red      wildfire smoke indoors, something burning
+    126 - 225 ug/m3   purple   should not happen indoors
+       226 + ug/m3    maroon   leave
+
+Normal indoor air with nothing happening sits in the single digits, so green
+is the expected steady state. Frying something will reliably reach yellow and
+often orange - that is the sensor working, not a fault.
