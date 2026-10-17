@@ -4,16 +4,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import LineChart from '../components/LineChart';
 import { Card, Header, Screen } from '../components/ui';
 import { fetchRange } from '../data/deviceFeed';
-import {
-  CHART_CONFIG,
-  generateSeries,
-  RANGES,
-  rangeStart,
-  rollingXLabels,
-  SERIES_METRICS,
-  toSeries,
-  xLabelsFor,
-} from '../data/history';
+import { CHART_CONFIG, RANGES, rangeStart, rollingXLabels, SERIES_METRICS, toSeries } from '../data/history';
 import { METRIC_INFO } from '../data/levels';
 import { useSettings } from '../state/SettingsContext';
 import { colors } from '../theme';
@@ -30,51 +21,38 @@ function EmptyChart({ text }) {
 
 export default function AnalyticsScreen() {
   const { settings } = useSettings();
-  const live = settings.source !== 'demo';
+  const deviceId = settings.deviceId;
   const [range, setRange] = useState('24h');
   const [history, setHistory] = useState({ state: 'loading', series: null, error: null });
 
   const load = useCallback(async () => {
-    if (!live) return;
+    if (!deviceId) return;
     setHistory({ state: 'loading', series: null, error: null });
     try {
       const now = Date.now();
-      const samples = await fetchRange(rangeStart(range, now), now);
+      const samples = await fetchRange(deviceId, rangeStart(range, now), now);
       setHistory({ state: 'ready', series: toSeries(samples, range, now), error: null, count: samples.length });
     } catch (error) {
       setHistory({ state: 'error', series: null, error });
     }
-  }, [live, range]);
+  }, [deviceId, range]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Demo mode keeps the simulated curves, which start at midnight rather than
-  // on a rolling window, so the two modes label the x axis differently.
-  const demoSeries = useMemo(
-    () =>
-      live ? null : Object.fromEntries(SERIES_METRICS.map((m) => [m, generateSeries(m, range)])),
-    [live, range]
-  );
-  const xLabels = useMemo(
-    () => (live ? rollingXLabels(range) : xLabelsFor(range)),
-    [live, range]
-  );
-
-  const series = live ? history.series : demoSeries;
+  const xLabels = useMemo(() => rollingXLabels(range), [range]);
+  const series = history.series;
 
   return (
     <Screen>
       <Header />
       {/* main dropped the screen title (the Header carries it now); this line
-          stays because it reports whether the chart is live or demo data. */}
+          stays because it reports how much real data the chart is drawn from. */}
       <Text style={styles.subtitle}>
-        {live
-          ? `Readings your node published, ending now${
-              history.state === 'ready' ? ` · ${history.count} samples` : ''
-            }`
-          : 'Simulated history, for trying the app out'}
+        {`Readings your node published, ending now${
+          history.state === 'ready' ? ` · ${history.count} samples` : ''
+        }`}
       </Text>
 
       <View style={styles.rangeRow}>
@@ -93,7 +71,7 @@ export default function AnalyticsScreen() {
         })}
       </View>
 
-      {live && history.state === 'error' ? (
+      {history.state === 'error' ? (
         <Card style={styles.errorCard}>
           <Ionicons name="cloud-offline-outline" size={28} color="#C62828" />
           <View style={{ flex: 1, marginLeft: 12 }}>
@@ -121,7 +99,7 @@ export default function AnalyticsScreen() {
                 <Ionicons name="information-circle-outline" size={24} color="#6B7B93" />
               </TouchableOpacity>
             </View>
-            {live && history.state === 'loading' ? (
+            {history.state === 'loading' ? (
               <View style={styles.emptyChart}>
                 <ActivityIndicator color={colors.primary} />
               </View>

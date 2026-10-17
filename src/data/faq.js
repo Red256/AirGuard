@@ -87,7 +87,12 @@ export function getFaqCategories() {
         {
           question: 'Is the data in the app real?',
           answer:
-            'Yes, by default. AirGuard reads the sensor node in your home:\n• A Sensirion SEN66 on a Particle Boron measures the air and publishes every 5 minutes\n• The readings go to a cloud database, and the app reads the newest one\n• Outdoor PM2.5 is the exception: nothing measures it yet, so it shows as No data\n• You can switch to simulated readings on the Alerts tab to see how the app responds to bad air',
+            'Yes. Every number in the app comes from the node you registered:\n• A Sensirion SEN66 on a Particle Boron measures the air and publishes every 5 minutes\n• The readings go to a cloud database, and the app reads the newest one\n• Outdoor PM2.5 is the exception: nothing measures it yet, so it shows as No data\n• There is no demo or simulated mode — if a reading is blank, the sensor did not report it',
+        },
+        {
+          question: 'How do I connect my node to the app?',
+          answer:
+            'AirGuard shows readings from one node, which you register the first time you open the app:\n• Enter the 24-character device id from the Particle console or the label on your node\n• AirGuard checks that the id has published readings before saving it\n• The id is stored on your phone, so you only do this once\n• To point the app at a different node, tap "Registered node" at the bottom of the Alerts tab',
         },
         {
           question: 'Why does a reading say "No data"?',

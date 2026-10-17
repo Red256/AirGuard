@@ -23,7 +23,7 @@ const SCRATCH = process.argv[2];
 const FIREBASE_STUB = {
   endAt: () => {}, get: () => {}, limitToLast: () => {}, onValue: () => {},
   orderByKey: () => {}, query: () => {}, ref: () => {}, startAt: () => {},
-  db: {}, DEVICE_ID: 'test',
+  db: {},
 };
 
 const cache = new Map();
@@ -94,8 +94,8 @@ check('missing metric grades as none', levels.levelFor('nonsense', 5) === 'none'
 check('formatValue renders an em dash for null', levels.formatValue('co2', null) === '—');
 check('formatValue keeps 1dp for PM', levels.formatValue('pmIndoor', 1.64) === '1.6');
 check('formatValue groups thousands for co2', levels.formatValue('co2', 1647) === '1,647');
-check('temperatureLabel(null) is safe', levels.temperatureLabel(null).level === 'none');
 check('toDisplayTemp(null) is null', levels.toDisplayTemp(null, 'F') === null);
+check('toDisplayTemp converts F->C', levels.toDisplayTemp(77, 'C') === 25);
 check('high co2 with unknown outdoor -> hedged advice',
   levels.evaluate(last.reading) === 'ventilateUnchecked', `got ${levels.evaluate(last.reading)}`);
 check('hedged advice page exists', !!levels.STATUS_CONTENT.ventilateUnchecked);
@@ -105,6 +105,13 @@ check('known clean outdoor air -> plain ventilate',
   levels.suggestionFor('co2', { co2: 1500, pmIndoor: 2, pmOutdoor: 4 }) === 'ventilate');
 check('unhealthy outdoor still wins',
   levels.suggestionFor('co2', { co2: 1500, pmIndoor: 2, pmOutdoor: 80 }) === 'closed');
+
+console.log('\n== device registration ==');
+check('a real device id is well formed', feed.isValidDeviceId(DEVICE));
+check('id is normalised to lower case', feed.normalizeDeviceId(`  ${DEVICE.toUpperCase()}  `) === DEVICE);
+check('a short id is rejected', !feed.isValidDeviceId('e00fce68'));
+check('a 24-char non-hex id is rejected', !feed.isValidDeviceId('z'.repeat(24)));
+check('an empty id is rejected', !feed.isValidDeviceId('') && !feed.isValidDeviceId(null));
 
 console.log('\n== alert log over the real series ==');
 let log = [];

@@ -9,11 +9,12 @@ import AlertsScreen from './src/screens/AlertsScreen';
 import FaqScreen from './src/screens/FaqScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import ReadingsScreen from './src/screens/ReadingsScreen';
+import RegisterDeviceScreen from './src/screens/RegisterDeviceScreen';
 import StartScreen from './src/screens/StartScreen';
 import SuggestionScreen from './src/screens/SuggestionScreen';
 import { AlertsProvider, useAlerts } from './src/state/AlertsContext';
 import { SensorProvider } from './src/state/SensorContext';
-import { SettingsProvider } from './src/state/SettingsContext';
+import { SettingsProvider, useSettings } from './src/state/SettingsContext';
 import { colors } from './src/theme';
 
 const Tab = createBottomTabNavigator();
@@ -43,6 +44,16 @@ function AlertsStackScreen() {
     <AlertsStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <AlertsStack.Screen name="AlertsList" component={AlertsScreen} />
       <AlertsStack.Screen name="AlertDetail" component={SuggestionScreen} />
+      {/* Re-registering from inside the app: the current device stays set until
+          a new id is confirmed, so backing out leaves the node connected. */}
+      <AlertsStack.Screen name="RegisterDevice">
+        {({ navigation }) => (
+          <RegisterDeviceScreen
+            onCancel={() => navigation.goBack()}
+            onDone={() => navigation.goBack()}
+          />
+        )}
+      </AlertsStack.Screen>
     </AlertsStack.Navigator>
   );
 }
@@ -77,21 +88,32 @@ function Tabs() {
   );
 }
 
-export default function App() {
+// Nothing in the app has data to show until a node is registered, so the tabs
+// stay behind that gate. Registration is stored on the device, so this is a
+// first-run flow only: later launches go straight to the readings.
+function Gate() {
+  const { registered } = useSettings();
   const [started, setStarted] = useState(false);
+
+  if (registered) {
+    return (
+      <NavigationContainer>
+        <Tabs />
+      </NavigationContainer>
+    );
+  }
+  if (!started) return <StartScreen onStart={() => setStarted(true)} />;
+  return <RegisterDeviceScreen />;
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
         <SensorProvider>
           <AlertsProvider>
             <StatusBar style="dark" />
-            {started ? (
-              <NavigationContainer>
-                <Tabs />
-              </NavigationContainer>
-            ) : (
-              <StartScreen onStart={() => setStarted(true)} />
-            )}
+            <Gate />
           </AlertsProvider>
         </SensorProvider>
       </SettingsProvider>

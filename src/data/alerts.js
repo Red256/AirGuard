@@ -90,29 +90,6 @@ export function applyReadings(events, readings, thresholds, now) {
   return changed ? next : events;
 }
 
-// Sample past alerts so the history isn't empty on first launch (sensor data here is simulated).
-export function seedEvents(now) {
-  const h = 60 * 60 * 1000;
-  const d = 24 * h;
-  const make = (metric, startAgo, durationH, peak, peakLevel, snapshot) => ({
-    id: `seed-${metric}-${startAgo}`,
-    metric,
-    startedAt: now - startAgo,
-    endedAt: now - startAgo + durationH * h,
-    lastSeen: now - startAgo + durationH * h,
-    peak,
-    peakLevel,
-    peakAt: now - startAgo + durationH * h * 0.55,
-    snapshot,
-  });
-  // Alerts are rare: a few Unhealthy events spread over the past month.
-  return [
-    make('pmOutdoor', 3 * d + 7 * h, 2.1, 54, 'bad', { co2: 705, pmIndoor: 9, pmOutdoor: 54 }),
-    make('co2', 11 * d + 9 * h, 3, 1410, 'bad', { co2: 1410, pmIndoor: 10, pmOutdoor: 8 }),
-    make('pmIndoor', 24 * d + 6 * h, 1.2, 47, 'bad', { co2: 905, pmIndoor: 47, pmOutdoor: 9 }),
-  ];
-}
-
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function formatTime(ts) {

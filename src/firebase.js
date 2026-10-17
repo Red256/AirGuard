@@ -16,8 +16,9 @@ const firebaseConfig = {
 };
 
 // The Boron publishes to device_data/<deviceId>/<epoch seconds> through a
-// Particle webhook. One device for now; this is the id its events carry.
-export const DEVICE_ID = 'e00fce6893f468b723fe10b0';
+// Particle webhook. Which device this install reads is not baked in: the user
+// registers their own node on first launch and the id is stored on the device
+// (see SettingsContext and RegisterDeviceScreen).
 
 // Firebase Analytics is deliberately not initialised: getAnalytics() needs a
 // browser document and throws under React Native. Use expo-firebase-analytics

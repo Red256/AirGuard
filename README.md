@@ -31,15 +31,19 @@ npm run verify     # check the database feed and the grading rules
 
 ## Firebase
 
-Configuration lives in [src/firebase.js](src/firebase.js), with the device id the
-app reads. Only two Firebase products are used:
+Configuration lives in [src/firebase.js](src/firebase.js). The device id is
+*not* there: the app reads whichever node the user registered on first launch
+(see [Device registration](#device-registration)). Only two Firebase products
+are used:
 
 - **`firebase/app`** — initialises the project.
-- **`firebase/database`** — the Realtime Database, read in two ways:
+- **`firebase/database`** — the Realtime Database, read in three ways:
   [`subscribeLatestReading()`](src/data/deviceFeed.js) keeps an `onValue`
   listener on the newest sample, so the Home tab updates the moment the node
-  publishes, and `fetchRange()` does a one-shot read of a time window for the
-  Analytics charts.
+  publishes; `fetchRange()` does a one-shot read of a time window for the
+  Analytics charts; and `lookupDevice()` checks a single id during registration.
+  All three take the device id as their first argument — nothing defaults to a
+  particular node.
 
 Firebase Analytics is deliberately *not* initialised — `getAnalytics()` needs a
 browser `document` and throws under React Native.
@@ -47,6 +51,27 @@ browser `document` and throws under React Native.
 The config values in `src/firebase.js` are committed on purpose. A Firebase web
 config is not a credential: it identifies the project, and access is decided by
 the database rules.
+
+## Device registration
+
+The app shows readings from exactly one node, and it will not show anything
+until that node is registered. There is no demo or simulated mode: every number
+on screen came from hardware.
+
+On first launch the user passes through `StartScreen`, then
+[`RegisterDeviceScreen`](src/screens/RegisterDeviceScreen.js), which asks for
+the Boron's 24-character Particle device id. Before saving it the screen calls
+`lookupDevice()` and refuses an id that has never published, so a typo is caught
+at registration rather than becoming an empty Home tab. The id is stored by
+[`SettingsContext`](src/state/SettingsContext.js) under `settings.deviceId` in
+`AsyncStorage`, so registration happens once per install. `App.js` gates the
+tabs on it.
+
+To point an install at a different node, tap **Registered node** at the bottom
+of the Alerts tab. The current id stays set until a new one is confirmed, so
+backing out of that screen leaves the app connected. Alert history is stored per
+device (`airguard.alerts.v4.<deviceId>`), so swapping nodes never mixes two
+homes' logs together.
 
 ### Stored shape
 

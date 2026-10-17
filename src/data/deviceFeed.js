@@ -1,5 +1,5 @@
 import { endAt, get, limitToLast, onValue, orderByKey, query, ref, startAt } from 'firebase/database';
-import { db, DEVICE_ID } from '../firebase';
+import { db } from '../firebase';
 
 // Live readings from the SEN66 node, as published by the Boron through the
 // Particle webhook into the Realtime Database:
@@ -15,6 +15,15 @@ import { db, DEVICE_ID } from '../firebase';
 // optional and maps to null rather than to 0.
 
 const devicePath = (deviceId) => `device_data/${deviceId}`;
+
+// A Particle device id is 24 hex characters. Checking the shape before we query
+// keeps a typo from becoming a database path, and lets the registration screen
+// say what is wrong without a round trip.
+const DEVICE_ID_RE = /^[0-9a-f]{24}$/;
+
+export const normalizeDeviceId = (input) => String(input || '').trim().toLowerCase();
+
+export const isValidDeviceId = (input) => DEVICE_ID_RE.test(normalizeDeviceId(input));
 
 const numberOr = (value, fallback = null) => (typeof value === 'number' && isFinite(value) ? value : fallback);
 
@@ -60,9 +69,29 @@ export function readingTime(key, entry) {
   return isFinite(fromKey) ? fromKey * 1000 : Date.now();
 }
 
+// Looks a device up during registration. Resolves to
+// { found, lastAt, reading } — found is false when the id has never published,
+// which is how the registration screen tells "wrong id" from "right id, but
+// the node has not reported yet". Rejects only if the database is unreachable.
+export async function lookupDevice(deviceId) {
+  const id = normalizeDeviceId(deviceId);
+  const latest = query(ref(db, devicePath(id)), orderByKey(), limitToLast(1));
+  const snapshot = await get(latest);
+  let newest = null;
+  snapshot.forEach((child) => {
+    newest = { key: child.key, value: child.val() };
+  });
+  if (!newest) return { found: false, lastAt: null, reading: null };
+  return {
+    found: true,
+    lastAt: readingTime(newest.key, newest.value),
+    reading: toReading(newest.value),
+  };
+}
+
 // Subscribes to the newest sample. Calls back with
 // { reading, at, error } and returns the unsubscribe function.
-export function subscribeLatestReading(onUpdate, deviceId = DEVICE_ID) {
+export function subscribeLatestReading(deviceId, onUpdate) {
   const latest = query(ref(db, devicePath(deviceId)), orderByKey(), limitToLast(1));
   return onValue(
     latest,
@@ -90,7 +119,7 @@ export function subscribeLatestReading(onUpdate, deviceId = DEVICE_ID) {
 // Node keys are epoch seconds as strings; orderByKey() with string bounds is a
 // lexicographic range, which is also chronological while the keys stay the
 // same length (10 digits until 2286).
-export async function fetchRange(fromMs, toMs = Date.now(), deviceId = DEVICE_ID) {
+export async function fetchRange(deviceId, fromMs, toMs = Date.now()) {
   const window = query(
     ref(db, devicePath(deviceId)),
     orderByKey(),

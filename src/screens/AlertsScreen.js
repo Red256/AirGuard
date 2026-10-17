@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CloudIcon, ParticlesIcon, SunIcon } from '../components/Icons';
 import { Card, Header, Pill, Screen } from '../components/ui';
 import {
@@ -13,9 +13,13 @@ import {
 } from '../data/alerts';
 import { formatValue, LEVEL_LABEL, levelFor, suggestionFor } from '../data/levels';
 import { useAlerts } from '../state/AlertsContext';
-import { SCENARIOS, useSensors } from '../state/SensorContext';
+import { useSensors } from '../state/SensorContext';
 import { useSettings } from '../state/SettingsContext';
 import { cardShadow, colors, palettes } from '../theme';
+
+// A 24-character device id does not fit on the row and is not worth reading in
+// full; the ends are enough to tell two nodes apart.
+const shortDeviceId = (id) => (id && id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id || '—');
 
 
 function MetricIcon({ metric, level, size = 34 }) {
@@ -39,7 +43,7 @@ function SectionTitle({ title, count }) {
 
 function CurrentAlert({ event, onOpen }) {
   const { settings } = useSettings();
-  const { readings } = useSensors();
+  const { readings, status } = useSensors();
   const meta = ALERT_META[event.metric];
   const now = readings[event.metric];
   const level = levelFor(event.metric, now, settings.thresholds);
@@ -109,48 +113,10 @@ function PastAlert({ event, onOpen }) {
   );
 }
 
-function SourceModal({ source, scenario, onSelect, onClose }) {
-  const selected = source === 'demo' ? scenario : 'live';
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.sheetTitle}>Where readings come from</Text>
-          <Text style={styles.sheetHint}>
-            Use the real node, or simulate a situation to see how the app responds.
-          </Text>
-          <TouchableOpacity style={styles.option} onPress={() => onSelect({ source: 'live' })}>
-            <Text style={[styles.optionText, selected === 'live' && styles.optionSelected]}>
-              Live sensor (AirGuard node)
-            </Text>
-            {selected === 'live' ? <Ionicons name="checkmark" size={22} color={colors.primary} /> : null}
-          </TouchableOpacity>
-          <Text style={styles.sheetGroup}>Simulated</Text>
-          {Object.entries(SCENARIOS).map(([key, s]) => (
-            <TouchableOpacity
-              key={key}
-              style={styles.option}
-              onPress={() => onSelect({ source: 'demo', scenario: key })}
-            >
-              <Text style={[styles.optionText, key === selected && styles.optionSelected]}>{s.name}</Text>
-              {key === selected ? <Ionicons name="checkmark" size={22} color={colors.primary} /> : null}
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Text style={styles.closeText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 export default function AlertsScreen({ navigation }) {
   const { current, past } = useAlerts();
-  const { settings, update } = useSettings();
+  const { settings } = useSettings();
   const { readings, status } = useSensors();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const live = settings.source !== 'demo';
 
   const groups = useMemo(() => {
     const out = [];
@@ -184,16 +150,16 @@ export default function AlertsScreen({ navigation }) {
       {current.length === 0 ? (
         <Card style={styles.emptyCard}>
           <Ionicons
-            name={status === 'ok' || status === 'demo' ? 'checkmark-circle' : 'cloud-offline-outline'}
+            name={status === 'ok' ? 'checkmark-circle' : 'cloud-offline-outline'}
             size={34}
-            color={status === 'ok' || status === 'demo' ? '#2E9E4B' : '#7A8AA0'}
+            color={status === 'ok' ? '#2E9E4B' : '#7A8AA0'}
           />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.emptyTitle}>
-              {status === 'ok' || status === 'demo' ? 'No active alerts' : 'No readings yet'}
+              {status === 'ok' ? 'No active alerts' : 'No readings yet'}
             </Text>
             <Text style={styles.emptyText}>
-              {status === 'ok' || status === 'demo'
+              {status === 'ok'
                 ? 'No readings are unhealthy right now.'
                 : 'Waiting for your node to publish. Nothing is being graded yet.'}
             </Text>
@@ -223,31 +189,25 @@ export default function AlertsScreen({ navigation }) {
         ))
       )}
 
-      <TouchableOpacity style={styles.demoRow} onPress={() => setPickerOpen(true)} accessibilityRole="button">
-        <Ionicons name={live ? 'hardware-chip' : 'flask'} size={18} color="#3F6EA8" />
-        <Text style={styles.demoLabel}>Readings source</Text>
-        <Text style={styles.demoValue}>
-          {live ? 'Live sensor' : (SCENARIOS[settings.scenario] || SCENARIOS.ventilate).name}
+      {/* Which node these alerts were logged from, and a way to point the app
+          at a different one. */}
+      <TouchableOpacity
+        style={styles.deviceRow}
+        onPress={() => navigation.navigate('RegisterDevice')}
+        accessibilityRole="button"
+        accessibilityLabel="Change registered node"
+      >
+        <Ionicons name="hardware-chip" size={18} color="#3F6EA8" />
+        <Text style={styles.deviceLabel}>Registered node</Text>
+        <Text style={styles.deviceValue} numberOfLines={1}>
+          {shortDeviceId(settings.deviceId)}
         </Text>
         <Ionicons name="chevron-forward" size={16} color="#7A8AA0" />
       </TouchableOpacity>
       <Text style={styles.footnote}>
-        {live
-          ? 'Alerts are logged on this device from the readings your node publishes.'
-          : 'Sensor readings and past alerts shown here are simulated.'}
+        Alerts are logged on this device from the readings your node publishes.
       </Text>
 
-      {pickerOpen ? (
-        <SourceModal
-          source={settings.source}
-          scenario={settings.scenario}
-          onClose={() => setPickerOpen(false)}
-          onSelect={(patch) => {
-            update(patch);
-            setPickerOpen(false);
-          }}
-        />
-      ) : null}
     </Screen>
   );
 }
@@ -292,7 +252,7 @@ const styles = StyleSheet.create({
   pastDetail: { fontSize: 13, color: colors.text, marginTop: 2 },
   pastTime: { fontSize: 12, color: colors.muted, marginTop: 2 },
   pastHint: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 4 },
-  demoRow: {
+  deviceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EAF1F8',
@@ -301,31 +261,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 16,
   },
-  demoLabel: { flex: 1, fontSize: 14, color: colors.text, marginLeft: 8 },
-  demoValue: { fontSize: 13, color: '#2A5DA8', marginRight: 6 },
+  deviceLabel: { flex: 1, fontSize: 14, color: colors.text, marginLeft: 8 },
+  deviceValue: { fontSize: 13, color: '#2A5DA8', marginRight: 6 },
   footnote: { textAlign: 'center', fontSize: 12, color: colors.muted, marginTop: 10 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(11,36,71,0.45)', justifyContent: 'center', padding: 24 },
-  sheet: { backgroundColor: '#fff', borderRadius: 22, padding: 22, ...cardShadow },
-  sheetTitle: { fontSize: 20, fontWeight: '700', color: colors.navy },
-  sheetHint: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 10 },
-  sheetGroup: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.muted,
-    letterSpacing: 0.6,
-    marginTop: 14,
-    marginBottom: 2,
-  },
-  option: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  optionText: { fontSize: 17, color: colors.text },
-  optionSelected: { color: colors.primary, fontWeight: '700' },
-  closeBtn: { alignSelf: 'flex-end', paddingVertical: 10, paddingHorizontal: 16, marginTop: 8 },
-  closeText: { fontSize: 16, color: colors.muted, fontWeight: '600' },
 });

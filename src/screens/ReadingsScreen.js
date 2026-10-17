@@ -68,7 +68,6 @@ const FEED_NOTE = {
   connecting: 'Connecting to your AirGuard node…',
   empty: 'Connected, but this device has not published any readings yet',
   error: 'Cannot reach the database — check your connection',
-  demo: 'Simulated demo data, not a real sensor',
 };
 
 function Row({ icon, name, sub, value, unit, unitBeside, pill, onPress }) {
@@ -193,8 +192,8 @@ export default function ReadingsScreen({ navigation }) {
         unitBeside
       />
 
-      {/* main dropped the InfoBox here; the feedNote line above already says
-          whether these readings are live or simulated. */}
+      {/* main dropped the InfoBox here; the feedNote line above already
+          reports the state of the feed. */}
       <Text style={styles.updated}>Updated: {updated}</Text>
     </Screen>
   );
