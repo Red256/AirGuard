@@ -3,12 +3,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlertsScreen from './src/screens/AlertsScreen';
 import FaqScreen from './src/screens/FaqScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import ReadingsScreen from './src/screens/ReadingsScreen';
+import StartScreen from './src/screens/StartScreen';
 import SuggestionScreen from './src/screens/SuggestionScreen';
 import { AlertsProvider, useAlerts } from './src/state/AlertsContext';
 import { SensorProvider } from './src/state/SensorContext';
@@ -22,8 +23,8 @@ const AlertsStack = createNativeStackNavigator();
 const TAB_ICONS = {
   Home: 'home',
   Alerts: 'notifications',
-  Analytics: 'bar-chart',
-  FAQ: 'help-circle',
+  Trends: 'bar-chart',
+  Resources: 'help-circle',
 };
 
 // Home is the readings list; tapping a reading that is above its limit opens a suggestion page.
@@ -59,31 +60,38 @@ function Tabs() {
         tabBarIcon: ({ color }) => <Ionicons name={TAB_ICONS[route.name]} size={26} color={color} />,
       })}
     >
-      <Tab.Screen name="Home" component={HomeStackScreen} />
+      {/* Leaving Home or Alerts closes any open detail page, so coming back shows the main page. */}
+      <Tab.Screen name="Home" component={HomeStackScreen} options={{ unmountOnBlur: true, tabBarLabel: 'My Air' }} />
       <Tab.Screen
         name="Alerts"
         component={AlertsStackScreen}
         options={{
+          unmountOnBlur: true,
           tabBarBadge: current.length > 0 ? current.length : undefined,
           tabBarBadgeStyle: { backgroundColor: '#E53935', color: '#FFFFFF' },
         }}
       />
-      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-      <Tab.Screen name="FAQ" component={FaqScreen} />
+      <Tab.Screen name="Trends" component={AnalyticsScreen} />
+      <Tab.Screen name="Resources" component={FaqScreen} />
     </Tab.Navigator>
   );
 }
 
 export default function App() {
+  const [started, setStarted] = useState(false);
   return (
     <SafeAreaProvider>
       <SettingsProvider>
         <SensorProvider>
           <AlertsProvider>
-            <NavigationContainer>
-              <StatusBar style="dark" />
-              <Tabs />
-            </NavigationContainer>
+            <StatusBar style="dark" />
+            {started ? (
+              <NavigationContainer>
+                <Tabs />
+              </NavigationContainer>
+            ) : (
+              <StartScreen onStart={() => setStarted(true)} />
+            )}
           </AlertsProvider>
         </SensorProvider>
       </SettingsProvider>

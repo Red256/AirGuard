@@ -168,21 +168,17 @@ export default function AlertsScreen({ navigation }) {
   const openCurrent = (event) =>
     navigation.navigate('AlertDetail', {
       kind: suggestionFor(event.metric, readings, settings.thresholds) || ALERT_META[event.metric].kind,
-      backLabel: 'Back to alerts',
     });
   const openPast = (event) =>
     navigation.navigate('AlertDetail', {
       kind: ALERT_META[event.metric].kind,
       event: { startedAt: event.startedAt, endedAt: event.endedAt, peakAt: event.peakAt || event.startedAt },
       snapshot: event.snapshot,
-      backLabel: 'Back to alerts',
     });
 
   return (
     <Screen>
       <Header />
-      <Text style={styles.title}>Alerts</Text>
-      <Text style={styles.subtitle}>Current and past air quality alerts</Text>
 
       <SectionTitle title="Current alerts" count={current.length} />
       {current.length === 0 ? (
@@ -257,8 +253,6 @@ export default function AlertsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800', color: colors.navy, marginTop: 4 },
-  subtitle: { fontSize: 16, color: colors.muted, marginBottom: 12, marginTop: 2 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.navy },
   countBadge: {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { LayoutAnimation, Platform, StyleSheet, Text, TouchableOpacity, UIManager, View } from 'react-native';
 import { Header, Screen } from '../components/ui';
 import { getFaqCategories, LEVEL_CARDS, levelRows } from '../data/faq';
+import { AlertTriangle, InfoBadge } from '../components/Icons';
 import { cardShadow, colors, palettes } from '../theme';
 
 // Enable LayoutAnimation on Android
@@ -11,8 +12,31 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const TABS = [
   { id: 0, title: 'Quick Facts', icon: '🎯' },
-  { id: 1, title: 'Q&A', icon: '❓' },
+  { id: 1, title: 'FAQ', icon: '❓' },
 ];
+
+const NEWLINE = String.fromCharCode(10);
+
+// Answers are written as lines. A line starting with "• " becomes a bullet whose wrapped
+// lines stay lined up with the first line of text, not under the bullet.
+function AnswerLines({ answer }) {
+  return answer.split(NEWLINE).map((line, i) => {
+    if (line.startsWith('• ')) {
+      return (
+        <View key={i} style={styles.bulletRow}>
+          <Text style={[styles.answerText, styles.bulletDot]}>•</Text>
+          <Text style={[styles.answerText, styles.bulletText]}>{line.slice(2)}</Text>
+        </View>
+      );
+    }
+    if (line.trim() === '') return <View key={i} style={styles.answerGap} />;
+    return (
+      <Text key={i} style={styles.answerText}>
+        {line}
+      </Text>
+    );
+  });
+}
 
 function FAQItem({ question, answer, isExpanded, onToggle }) {
   return (
@@ -23,7 +47,7 @@ function FAQItem({ question, answer, isExpanded, onToggle }) {
       </TouchableOpacity>
       {isExpanded && (
         <View style={styles.answerContainer}>
-          <Text style={styles.answerText}>{answer}</Text>
+          <AnswerLines answer={answer} />
         </View>
       )}
     </View>
@@ -42,7 +66,13 @@ function CategorySection({ category, expandedItems, onToggleItem }) {
     <View style={styles.categorySection}>
       <TouchableOpacity onPress={toggleCategory} style={styles.categoryHeader} accessibilityRole="button" accessibilityState={{ expanded: isExpanded }}>
         <View style={styles.categoryTitleContainer}>
-          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          {category.badge === 'info' ? (
+            <View style={styles.categoryBadge}>
+              <InfoBadge size={28} />
+            </View>
+          ) : (
+            <Text style={styles.categoryIcon}>{category.icon}</Text>
+          )}
           <Text style={styles.categoryTitle}>{category.category}</Text>
         </View>
         <Text style={styles.categoryExpandIcon}>{isExpanded ? '▼' : '▶'}</Text>
@@ -87,9 +117,6 @@ function QuickFactsTab() {
   const rows = levelRows();
   return (
     <View style={styles.faqContent}>
-      <Text style={styles.presentationTitle}>Know Your Levels</Text>
-      <Text style={styles.presentationSubtitle}>Every reading is Good, Moderate or Unhealthy. Alerts only show up when a reading is Unhealthy.</Text>
-
       {LEVEL_CARDS.map((c) => (
         <View key={c.level} style={[styles.levelCard, { borderLeftColor: palettes[c.level].accent }]}>
           <Text style={styles.levelIcon}>{c.icon}</Text>
@@ -106,7 +133,8 @@ function QuickFactsTab() {
           <View style={styles.cellLabel} />
           {['good', 'moderate', 'bad'].map((l) => (
             <View key={l} style={[styles.headCell, { backgroundColor: palettes[l].pillBg }]}>
-              <Text style={[styles.headText, { color: palettes[l].pillText }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {l === 'bad' ? <AlertTriangle size={12} color={palettes.bad.accent} /> : null}
+              <Text style={[styles.headText, { color: palettes[l].pillText }, l === 'bad' && { marginLeft: 3 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {l === 'good' ? 'Good' : l === 'moderate' ? 'Moderate' : 'Unhealthy'}
               </Text>
             </View>
@@ -123,7 +151,6 @@ function QuickFactsTab() {
             <Text style={styles.cell}>{r.bad}</Text>
           </View>
         ))}
-        <Text style={styles.tableNote}>Temperature and humidity never trigger alerts.</Text>
       </View>
     </View>
   );
@@ -135,11 +162,6 @@ export default function FaqScreen() {
   return (
     <Screen>
       <Header />
-
-      <View style={styles.banner}>
-        <Text style={styles.bannerTitle}>☁️ Air Quality Guide</Text>
-        <Text style={styles.bannerSubtitle}>Essential information for understanding your readings and alerts</Text>
-      </View>
 
       <View style={styles.tabContainer}>
         {TABS.map((tab) => (
@@ -157,43 +179,24 @@ export default function FaqScreen() {
       </View>
 
       {activeTab === 0 ? <QuickFactsTab /> : <QATab />}
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>💡 Remember: Alerts only appear when a reading is Unhealthy.</Text>
-        <Text style={styles.footerText}>This information is for general awareness, not medical advice.</Text>
-      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  // Header banner and tabs (modeled on the Coyote Alert FAQ)
-  banner: {
-    backgroundColor: '#CFE6F5',
-    paddingTop: 24,
-    paddingBottom: 20,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginTop: 4,
-    ...cardShadow,
-  },
-  bannerTitle: { fontSize: 28, fontWeight: 'bold', color: colors.navy, textAlign: 'center', marginBottom: 8 },
-  bannerSubtitle: { fontSize: 16, color: colors.infoText, textAlign: 'center', lineHeight: 22 },
+  // Tabs (modeled on the Coyote Alert FAQ)
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    marginTop: 16,
+    marginTop: 4,
     borderRadius: 24,
     padding: 8,
-    borderWidth: 2,
-    borderColor: '#000',
     ...cardShadow,
   },
-  tab: { flex: 1, paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center', borderRadius: 20, marginHorizontal: 2 },
+  tab: { flex: 1, paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center', borderRadius: 20, marginHorizontal: 2, backgroundColor: palettes.bad.pillBg },
   activeTab: { backgroundColor: '#D5EFD8', ...cardShadow },
   tabIcon: { fontSize: 20, marginBottom: 4 },
-  tabText: { fontSize: 12, color: colors.muted, fontWeight: '500' },
+  tabText: { fontSize: 12, color: colors.muted, fontWeight: 'bold' },
   activeTabText: { color: colors.navy, fontWeight: 'bold' },
 
   // Q&A
@@ -220,21 +223,22 @@ const styles = StyleSheet.create({
   },
   categoryTitleContainer: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   categoryIcon: { fontSize: 24, marginRight: 12 },
+  categoryBadge: { width: 33, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   categoryTitle: { fontSize: 18, fontWeight: '600', color: '#2c3e50', flexShrink: 1 },
   categoryExpandIcon: { fontSize: 16, color: '#7f8c8d', fontWeight: 'bold' },
   questionsContainer: { backgroundColor: '#fff' },
   faqItem: { borderBottomWidth: 1, borderBottomColor: '#f1f2f6' },
   questionContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  questionText: { fontSize: 16, fontWeight: '500', color: '#2c3e50', flex: 1, marginRight: 12, lineHeight: 22 },
+  questionText: { fontSize: 16, fontWeight: 'bold', color: colors.primary, flex: 1, marginRight: 12, lineHeight: 22 },
   expandIcon: { fontSize: 20, color: '#3498db', fontWeight: 'bold' },
   answerContainer: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4, backgroundColor: '#f8f9fa' },
   answerText: { fontSize: 15, color: '#34495e', lineHeight: 24 },
-  footer: { padding: 20, alignItems: 'center' },
-  footerText: { fontSize: 14, color: '#7f8c8d', textAlign: 'center', lineHeight: 20, marginBottom: 8 },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  bulletDot: { width: 16 },
+  bulletText: { flex: 1 },
+  answerGap: { height: 8 },
 
   // Quick Facts
-  presentationTitle: { fontSize: 24, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', marginBottom: 8 },
-  presentationSubtitle: { fontSize: 16, color: '#7f8c8d', textAlign: 'center', marginBottom: 20, lineHeight: 22 },
   levelCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -269,8 +273,7 @@ const styles = StyleSheet.create({
   cellLabel: { width: 76, paddingRight: 4 },
   labelText: { fontSize: 12, fontWeight: '700', color: '#2c3e50' },
   unitText: { fontSize: 11, color: '#7f8c8d' },
-  headCell: { flex: 1, borderRadius: 8, paddingVertical: 5, marginHorizontal: 2, alignItems: 'center' },
-  headText: { fontSize: 11, fontWeight: '700' },
+  headCell: { flex: 1, flexDirection: 'row', borderRadius: 8, paddingVertical: 5, marginHorizontal: 2, alignItems: 'center', justifyContent: 'center' },
+  headText: { fontSize: 11, fontWeight: '700', flexShrink: 1 },
   cell: { flex: 1, fontSize: 12, color: '#34495e', textAlign: 'center', paddingHorizontal: 1 },
-  tableNote: { fontSize: 13, color: '#7f8c8d', marginTop: 10, lineHeight: 18 },
 });

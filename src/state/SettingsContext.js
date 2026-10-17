@@ -6,7 +6,6 @@ const STORAGE_KEY = 'airguard.settings.v1';
 
 export const DEFAULT_SETTINGS = {
   thresholds: DEFAULT_THRESHOLDS,
-  tempUnit: 'F',
   updateSeconds: 60,
   // 'live'  - readings from the SEN66 node via Firebase
   // 'demo'  - the simulated scenario named by `scenario`

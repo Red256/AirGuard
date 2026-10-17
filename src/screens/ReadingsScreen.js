@@ -1,22 +1,45 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { CloudIcon, DropIcon, ParticlesIcon, SunIcon, ThermometerIcon } from '../components/Icons';
-import { Card, Header, InfoBox, Pill, Screen } from '../components/ui';
+import { CloudIcon, DropIcon, ParticlesIcon, SunIcon, ThermometerIcon, WarningBadge } from '../components/Icons';
+import { Card, Header, Pill, Screen } from '../components/ui';
 import {
-  evaluate,
   formatValue,
-  humidityLabel,
   LEVEL_LABEL,
   levelFor,
   STATUS_CONTENT,
   suggestionFor,
-  temperatureLabel,
   toDisplayTemp,
 } from '../data/levels';
 import { useRelativeTime, useSensors } from '../state/SensorContext';
 import { useSettings } from '../state/SettingsContext';
 import { colors, palettes } from '../theme';
+
+// Order alerts are shown in when more than one is active.
+const ALERT_ORDER = ['closed', 'indoor', 'ventilate'];
+
+function AlertBanner({ kind, onLearnMore }) {
+  const content = STATUS_CONTENT[kind];
+  const palette = palettes[content.palette];
+  return (
+    <View style={[styles.alertTitleRow, { backgroundColor: palette.bg, borderColor: palette.title }]}>
+      <View style={styles.alertTitleLine}>
+        <WarningBadge size={40} color={palettes.bad.accent} />
+        <Text style={[styles.alertTitle, { color: palette.title }]}>{content.shortTitle}</Text>
+      </View>
+      <TouchableOpacity
+        style={styles.learnMore}
+        onPress={onLearnMore}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`Learn more about: ${content.shortTitle}`}
+      >
+        <Text style={styles.learnMoreText}>Learn more</Text>
+        <Ionicons name="arrow-forward" size={16} color={colors.primary} style={{ marginLeft: 4 }} />
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 const GOOD_COPY = {
   co2: {
@@ -48,24 +71,24 @@ const FEED_NOTE = {
   demo: 'Simulated demo data, not a real sensor',
 };
 
-function Row({ icon, name, sub, value, unit, pill, onPress, accent }) {
+function Row({ icon, name, sub, value, unit, unitBeside, pill, onPress }) {
   // On narrow phones there isn't room for name, value and pill side by side,
   // so the pill moves under the name instead of squeezing it.
   const { width } = useWindowDimensions();
   const compact = width < 360;
   const body = (
-    <Card style={[styles.row, onPress && { borderWidth: 1.5, borderColor: accent }]}>
+    <Card style={styles.row}>
       <View style={styles.rowIcon}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowName}>{name}</Text>
         <Text style={styles.rowSub}>{onPress ? 'Tap for suggestion' : sub}</Text>
-        {compact ? <View style={styles.rowPillCompact}>{pill}</View> : null}
+        {compact && pill ? <View style={styles.rowPillCompact}>{pill}</View> : null}
       </View>
-      <View style={styles.rowValueWrap}>
-        <Text style={styles.rowValue}>{value}</Text>
-        <Text style={styles.rowUnit}>{unit}</Text>
+      <View style={[styles.rowValueWrap, unitBeside && styles.rowValueWrapBeside, unitBeside && (compact ? styles.rowValueBesideNarrow : styles.rowValueBesideWide)]}>
+        <Text style={[styles.rowValue, unitBeside && styles.rowValueBeside]}>{value}</Text>
+        <Text style={[styles.rowUnit, unitBeside && styles.rowUnitBeside]}>{unit}</Text>
       </View>
-      {compact ? null : <View style={styles.rowPill}>{pill}</View>}
+      {compact || unitBeside ? null : <View style={styles.rowPill}>{pill}</View>}
     </Card>
   );
   if (!onPress) return body;
@@ -92,8 +115,6 @@ export default function ReadingsScreen({ navigation }) {
     pmIndoor: levelFor('pmIndoor', readings.pmIndoor, settings.thresholds),
     pmOutdoor: levelFor('pmOutdoor', readings.pmOutdoor, settings.thresholds),
   };
-  const temp = temperatureLabel(readings.temp);
-  const hum = humidityLabel(readings.rh);
 
   // A reading above its limit opens the suggestion page for that reading.
   const tapProps = (metric) => {
@@ -101,38 +122,26 @@ export default function ReadingsScreen({ navigation }) {
     if (!kind) return {};
     return {
       onPress: () => navigation.navigate('Suggestion', { kind }),
-      accent: palettes[lv[metric]].accent,
     };
   };
   const anyTappable = ['co2', 'pmIndoor', 'pmOutdoor'].some((m) => suggestionFor(m, readings, settings.thresholds));
 
   // With an active alert, the page title becomes the alert itself, with a link to what to do.
-  const alertKind = evaluate(readings, settings.thresholds);
-  const activeAlert = alertKind !== 'good' ? STATUS_CONTENT[alertKind] : null;
+  const alertKinds = ALERT_ORDER.filter((kind) =>
+    ['pmOutdoor', 'pmIndoor', 'co2'].some((m) => suggestionFor(m, readings, settings.thresholds) === kind),
+  );
 
   return (
     <Screen>
       <Header />
-      {activeAlert ? (
-        <View style={styles.alertTitleRow}>
-          <Text style={styles.alertTitle}>⚠️ {activeAlert.shortTitle}</Text>
-          <TouchableOpacity
-            style={styles.learnMore}
-            onPress={() => navigation.navigate('Suggestion', { kind: alertKind })}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={`Learn more about: ${activeAlert.shortTitle}`}
-          >
-            <Text style={styles.learnMoreText}>Learn more</Text>
-            <Ionicons name="arrow-forward" size={16} color={colors.primary} style={{ marginLeft: 4 }} />
-          </TouchableOpacity>
-        </View>
+      {alertKinds.length > 0 ? (
+        alertKinds.map((kind) => (
+          <AlertBanner key={kind} kind={kind} onLearnMore={() => navigation.navigate('Suggestion', { kind })} />
+        ))
       ) : (
         <Text style={styles.title}>Sensor Readings</Text>
       )}
-      <Text style={styles.subtitle}>
-        {anyTappable ? 'Tap a highlighted reading to see what to do' : 'Live data from your AirGuard node'}
-      </Text>
+      {anyTappable ? null : <Text style={styles.subtitle}>Live data from your AirGuard node</Text>}
       {feedNote ? (
         <Text style={[styles.feedNote, status === 'error' && styles.feedNoteError]}>{feedNote}</Text>
       ) : null}
@@ -164,28 +173,28 @@ export default function ReadingsScreen({ navigation }) {
         pill={<Pill label={LEVEL_LABEL[lv.pmOutdoor]} palette={lv.pmOutdoor} />}
         {...tapProps('pmOutdoor')}
       />
+
+      {/* Shown for information only: temperature and humidity are not rated. */}
+      <View style={styles.rowGroupGap} />
       <Row
         icon={<ThermometerIcon size={36} />}
         name="Temperature"
-        sub={temp.note ? `Indoor temperature · ${temp.note}` : 'Indoor temperature'}
+        sub="Indoor temperature"
         value={formatValue('temp', toDisplayTemp(readings.temp, settings.tempUnit))}
         unit={settings.tempUnit === 'C' ? '°C' : '°F'}
-        pill={<Pill label={temp.label} palette={temp.palette} />}
+        unitBeside
       />
       <Row
         icon={<DropIcon size={34} />}
-        name="Relative Humidity"
-        sub={hum.note ? `Indoor humidity · ${hum.note}` : 'Indoor humidity'}
+        name="Humidity"
+        sub="Indoor humidity"
         value={formatValue('rh', readings.rh)}
         unit="%"
-        pill={<Pill label={hum.label} palette={hum.palette} />}
+        unitBeside
       />
 
-      <InfoBox>
-        {status === 'demo'
-          ? 'Simulated readings, for trying the app out.\nSwitch back to the live node on the Alerts tab.'
-          : 'Readings come from your SEN66 node, which publishes every 5 minutes.\nOutdoor PM2.5 needs a second, outdoor sensor.'}
-      </InfoBox>
+      {/* main dropped the InfoBox here; the feedNote line above already says
+          whether these readings are live or simulated. */}
       <Text style={styles.updated}>Updated: {updated}</Text>
     </Screen>
   );
@@ -194,9 +203,17 @@ export default function ReadingsScreen({ navigation }) {
 const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.navy, marginTop: 4 },
   // "Learn more" always sits on its own left-aligned line under the alert title.
-  alertTitleRow: { marginTop: 4 },
-  alertTitle: { fontSize: 28, lineHeight: 34, fontWeight: '800', color: colors.navy },
-  learnMore: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 4, marginBottom: 14 },
+  // Outline (in the alert's own color) around the active alert and its Learn more link.
+  alertTitleRow: {
+    marginTop: 4,
+    marginBottom: 12,
+    padding: 14,
+    borderWidth: 2,
+    borderRadius: 16,
+  },
+  alertTitleLine: { flexDirection: 'row', alignItems: 'center' },
+  alertTitle: { flex: 1, fontSize: 28, lineHeight: 34, fontWeight: '800', color: colors.navy, marginLeft: 10 },
+  learnMore: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 6 },
   learnMoreText: { fontSize: 16, fontWeight: '600', color: colors.primary },
   subtitle: { fontSize: 16, color: colors.muted, marginBottom: 14, marginTop: 2 },
   feedNote: { fontSize: 13, color: colors.muted, marginTop: -8, marginBottom: 12 },
@@ -208,7 +225,15 @@ const styles = StyleSheet.create({
   rowValueWrap: { alignItems: 'center', minWidth: 52, marginHorizontal: 6 },
   rowValue: { fontSize: 24, fontWeight: '800', color: colors.navy },
   rowUnit: { fontSize: 12, color: colors.muted },
+  // Unrated rows: the value sits centered in the whole right-hand area (value column + rating slot).
+  rowValueWrapBeside: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', marginHorizontal: 0, flexShrink: 0 },
+  // Same left edge as before, but narrower with a right margin, so the value sits further left.
+  rowValueBesideWide: { width: 112, marginRight: 44 },
+  rowValueBesideNarrow: { width: 84, marginRight: 16 },
+  rowValueBeside: { fontSize: 20, fontWeight: '400', color: '#000000' },
+  rowUnitBeside: { fontSize: 20, fontWeight: '400', color: '#000000', marginLeft: 3 },
   rowPill: { minWidth: 92, alignItems: 'center', flexShrink: 0 },
+  rowGroupGap: { height: 34 },
   rowPillCompact: { marginTop: 6, flexDirection: 'row' },
   updated: { textAlign: 'center', color: colors.muted, fontSize: 14, marginTop: 14 },
 });

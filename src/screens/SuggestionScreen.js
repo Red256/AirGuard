@@ -31,7 +31,7 @@ function MetricTile({ metric, label, value, unit, level, icon }) {
   );
 }
 
-export default function SuggestionScreen({ navigation, route }) {
+export default function SuggestionScreen({ route }) {
   const { settings } = useSettings();
   const { readings, updatedAt } = useSensors();
   const updated = useRelativeTime(updatedAt);
@@ -54,11 +54,6 @@ export default function SuggestionScreen({ navigation, route }) {
     <Screen>
       <Header />
 
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} hitSlop={10} accessibilityLabel={params.backLabel || 'Back to readings'}>
-        <Ionicons name="chevron-back" size={22} color={colors.primary} />
-        <Text style={styles.backText}>{params.backLabel || 'Back to readings'}</Text>
-      </TouchableOpacity>
-
       {past ? (
         <View style={styles.pastBanner}>
           <Text style={styles.pastBannerTitle}>🕒 Past alert</Text>
@@ -70,7 +65,7 @@ export default function SuggestionScreen({ navigation, route }) {
       ) : null}
 
       <View style={[styles.statusCard, { backgroundColor: palette.bg }]}>
-        {content.icon === 'leaf' ? <LeafBadge color={palette.accent} /> : <WarningBadge color={palette.accent} />}
+        {content.icon === 'leaf' ? <LeafBadge color={palette.accent} /> : <WarningBadge color={palettes.bad.accent} />}
         <Text style={[styles.statusTitle, { color: palette.title }]}>{content.title}</Text>
         <Text style={styles.statusMessage}>{content.message}</Text>
       </View>
@@ -152,8 +147,6 @@ const styles = StyleSheet.create({
   pastBannerTitle: { fontSize: 15, fontWeight: '700', color: colors.navy },
   pastBannerText: { fontSize: 15, color: colors.text, marginTop: 4 },
   pastBannerSub: { fontSize: 13, color: colors.muted, marginTop: 3 },
-  back: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, alignSelf: 'flex-start' },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600', marginLeft: 2 },
   statusCard: { borderRadius: 24, paddingVertical: 24, paddingHorizontal: 18, alignItems: 'center' },
   statusTitle: { fontSize: 34, fontWeight: '800', textAlign: 'center', marginTop: 10, lineHeight: 40 },
   statusMessage: { fontSize: 17, lineHeight: 25, color: '#1B2A41', textAlign: 'center', marginTop: 8 },

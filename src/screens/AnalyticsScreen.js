@@ -67,7 +67,8 @@ export default function AnalyticsScreen() {
   return (
     <Screen>
       <Header />
-      <Text style={styles.title}>Air Quality Analytics</Text>
+      {/* main dropped the screen title (the Header carries it now); this line
+          stays because it reports whether the chart is live or demo data. */}
       <Text style={styles.subtitle}>
         {live
           ? `Readings your node published, ending now${
@@ -153,7 +154,6 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800', color: colors.navy, marginTop: 4 },
   subtitle: { fontSize: 14, color: colors.muted, marginTop: 2, marginBottom: 12 },
   rangeRow: {
     flexDirection: 'row',
