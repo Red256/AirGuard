@@ -9,10 +9,6 @@ export const BANDS = {
   pmOutdoor: { good: 12, moderate: 35 }, // µg/m³
 };
 
-// Temperature and humidity have a Good range; outside it is Moderate for a short distance, then Unhealthy.
-export const TEMP_BAND = { goodMin: 64, goodMax: 77, margin: 6 }; // °F
-export const HUMIDITY_BAND = { goodMin: 30, goodMax: 60, margin: 10 }; // %
-
 export const DEFAULT_THRESHOLDS = BANDS;
 
 export const METRICS = {
@@ -28,29 +24,6 @@ export function levelFor(metric, value, thresholds = BANDS) {
   if (value <= band.good) return 'good';
   if (value <= band.moderate) return 'moderate';
   return 'bad';
-}
-
-function bandLevel(value, { goodMin, goodMax, margin }) {
-  if (value >= goodMin && value <= goodMax) return 'good';
-  const distance = value < goodMin ? goodMin - value : value - goodMax;
-  return distance <= margin ? 'moderate' : 'bad';
-}
-
-// `note` says which way a reading is off (Cool, Warm, Dry, Humid) and is null when Good.
-export function temperatureLabel(tempF) {
-  const level = bandLevel(tempF, TEMP_BAND);
-  const note = level === 'good' ? null : tempF < TEMP_BAND.goodMin ? 'Cool' : 'Warm';
-  return { level, label: LEVEL_LABEL[level], palette: level, note };
-}
-
-export function humidityLabel(rh) {
-  const level = bandLevel(rh, HUMIDITY_BAND);
-  const note = level === 'good' ? null : rh < HUMIDITY_BAND.goodMin ? 'Dry' : 'Humid';
-  return { level, label: LEVEL_LABEL[level], palette: level, note };
-}
-
-export function toDisplayTemp(tempF, unit) {
-  return unit === 'C' ? Math.round(((tempF - 32) * 5) / 9) : Math.round(tempF);
 }
 
 // Decides what the suggestion page should say when no specific reading was tapped.
@@ -104,9 +77,9 @@ export const STATUS_CONTENT = {
   indoor: {
     palette: 'moderate',
     icon: 'warning',
-    title: 'REDUCE INDOOR\nSOURCES',
-    shortTitle: 'Reduce Indoor Sources',
-    message: 'Indoor PM2.5 is high.\nIndoor particle levels are much\nhigher than outdoors.',
+    title: 'VENTILATE AND CHECK\nINDOOR SOURCES',
+    shortTitle: 'Ventilate and Check Indoor Sources',
+    message: 'Indoor PM2.5 is high.\nIndoor PM2.5 levels are much\nhigher than outdoors.',
     info: null,
     learn: null,
   },
@@ -132,7 +105,7 @@ export const INDOOR_ACTIONS = [
 ];
 
 export const INDOOR_SOURCES_TEXT =
-  'Cooking, smoke, candles, and other indoor sources can increase particle levels inside your home.';
+  'Cooking, smoke, candles, and other indoor sources can increase PM2.5 levels inside your home.';
 
 export const METRIC_INFO = {
   co2: {

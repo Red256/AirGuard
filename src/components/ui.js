@@ -3,6 +3,7 @@ import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cardShadow, colors, palettes } from '../theme';
+import { AlertTriangle } from './Icons';
 
 export function Screen({ children }) {
   const insets = useSafeAreaInsets();
@@ -30,6 +31,14 @@ export function Header() {
 
 export function Pill({ label, palette = 'good', style }) {
   const p = palettes[palette];
+  // Unhealthy is shown as a big red hazard sign, without the word.
+  if (palette === 'bad') {
+    return (
+      <View style={[styles.hazard, style]} accessible accessibilityLabel={label}>
+        <AlertTriangle size={38} color={p.accent} />
+      </View>
+    );
+  }
   return (
     <View style={[styles.pill, { backgroundColor: p.pillBg }, style]}>
       <Text
@@ -70,8 +79,9 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center' },
   logo: { width: 48, height: 48 },
   brandText: { fontSize: 26, fontWeight: '700', color: colors.navy, marginLeft: 8 },
-  pill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: 'center', flexShrink: 0 },
-  pillText: { fontSize: 13, fontWeight: '600' },
+  hazard: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: 'center', flexShrink: 0 },
+  pillText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
   card: { backgroundColor: colors.card, borderRadius: 20, ...cardShadow },
   infoBox: {
     flexDirection: 'row',

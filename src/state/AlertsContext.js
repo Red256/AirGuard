@@ -4,7 +4,7 @@ import { applyReadings, seedEvents } from '../data/alerts';
 import { useSensors } from './SensorContext';
 import { useSettings } from './SettingsContext';
 
-const STORAGE_KEY = 'airguard.alerts.v3';
+const STORAGE_KEY = 'airguard.alerts.v4';
 const MAX_EVENTS = 100;
 
 const AlertsContext = createContext({ current: [], past: [] });

@@ -68,6 +68,17 @@ export function DropIcon({ size = 32, color = '#1E88E5' }) {
   );
 }
 
+// Blue circle with a white "i".
+export function InfoBadge({ size = 28, color = '#1E88E5' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Circle cx="24" cy="24" r="24" fill={color} />
+      <Circle cx="24" cy="14.5" r="3.4" fill="#FFFFFF" />
+      <Rect x="20.6" y="21" width="6.8" height="16.5" rx="3.2" fill="#FFFFFF" />
+    </Svg>
+  );
+}
+
 export function LeafBadge({ size = 84, color = '#2E9E4B' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 80 80">
@@ -87,6 +98,17 @@ export function WarningBadge({ size = 84, color = '#E53935' }) {
         <Rect x="37.5" y="29" width="5" height="16" rx="2.5" fill={color} />
         <Circle cx="40" cy="51" r="3" fill={color} />
       </G>
+    </Svg>
+  );
+}
+
+// Red triangle with a white exclamation mark, used in the alert banner.
+export function AlertTriangle({ size = 30, color = '#E53935' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 80 80">
+      <Path d="M40 10 L72 66 H8 Z" fill={color} stroke={color} strokeWidth="8" strokeLinejoin="round" />
+      <Rect x="36.5" y="30" width="7" height="19" rx="3.5" fill="#FFFFFF" />
+      <Circle cx="40" cy="57" r="4" fill="#FFFFFF" />
     </Svg>
   );
 }

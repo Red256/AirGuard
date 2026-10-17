@@ -20,7 +20,6 @@ export default function AnalyticsScreen({ navigation }) {
   return (
     <Screen>
       <Header />
-      <Text style={styles.title}>Air Quality Analytics</Text>
 
       <View style={styles.rangeRow}>
         {Object.entries(RANGES).map(([key, r]) => {
@@ -69,7 +68,6 @@ export default function AnalyticsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 28, fontWeight: '800', color: colors.navy, marginTop: 4, marginBottom: 12 },
   rangeRow: {
     flexDirection: 'row',
     backgroundColor: '#E6EEF6',

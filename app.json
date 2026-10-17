@@ -15,7 +15,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.airguard.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/adaptive-icon-cloud.png",
         "backgroundColor": "#FFFFFF"
       }
     },
@@ -26,6 +26,6 @@
     "plugins": [
       "expo-font"
     ],
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon-cloud.png"
   }
 }

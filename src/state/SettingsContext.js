@@ -6,7 +6,6 @@ const STORAGE_KEY = 'airguard.settings.v1';
 
 export const DEFAULT_SETTINGS = {
   thresholds: DEFAULT_THRESHOLDS,
-  tempUnit: 'F',
   updateSeconds: 60,
   scenario: 'ventilate',
 };

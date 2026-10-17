@@ -5,22 +5,22 @@ export const ALERT_METRICS = ['pmOutdoor', 'pmIndoor', 'co2'];
 // Per-metric wording. `kind` is the STATUS_CONTENT key shown on the suggestion page.
 export const ALERT_META = {
   pmOutdoor: {
-    title: 'Unhealthy outdoor air quality',
+    title: 'Unhealthy outdoor PM2.5 level',
     action: 'Keep windows closed',
     kind: 'closed',
     label: 'Outdoor PM2.5',
     unit: 'µg/m³',
   },
   pmIndoor: {
-    title: 'Unhealthy indoor particle levels',
-    action: 'Reduce indoor sources',
+    title: 'Unhealthy indoor PM2.5 level',
+    action: 'Ventilate and check indoor sources',
     kind: 'indoor',
     label: 'Indoor PM2.5',
     unit: 'µg/m³',
   },
   co2: {
-    title: 'Unhealthy CO₂ level',
-    action: 'Open a window to ventilate',
+    title: 'Unhealthy indoor CO₂ level',
+    action: 'Open window to ventilate',
     kind: 'ventilate',
     label: 'Indoor CO₂',
     unit: 'ppm',
@@ -101,9 +101,9 @@ export function seedEvents(now) {
   });
   // Alerts are rare: a few Unhealthy events spread over the past month.
   return [
-    make('pmOutdoor', 3 * d + 7 * h, 2.1, 54, 'bad', { co2: 705, pmIndoor: 9, pmOutdoor: 54, temp: 73, rh: 44 }),
-    make('co2', 11 * d + 9 * h, 3, 1410, 'bad', { co2: 1410, pmIndoor: 10, pmOutdoor: 8, temp: 76, rh: 51 }),
-    make('pmIndoor', 24 * d + 6 * h, 1.2, 47, 'bad', { co2: 905, pmIndoor: 47, pmOutdoor: 9, temp: 75, rh: 53 }),
+    make('pmOutdoor', 3 * d + 7 * h, 2.1, 54, 'bad', { co2: 705, pmIndoor: 9, pmOutdoor: 54 }),
+    make('co2', 11 * d + 9 * h, 3, 1410, 'bad', { co2: 1410, pmIndoor: 10, pmOutdoor: 8 }),
+    make('pmIndoor', 24 * d + 6 * h, 1.2, 47, 'bad', { co2: 905, pmIndoor: 47, pmOutdoor: 9 }),
   ];
 }
 

@@ -3,12 +3,12 @@ import { useSettings } from './SettingsContext';
 
 // Simulated sensors. Swap makeReading() for a real sensor / API call when hardware exists.
 export const SCENARIOS = {
-  ventilate: { name: 'Ventilate Now', co2: 1350, pmIndoor: 8, pmOutdoor: 5, temp: 72, rh: 46 },
-  closed: { name: 'Keep Windows Closed', co2: 1080, pmIndoor: 12, pmOutdoor: 63, temp: 72, rh: 46 },
-  indoor: { name: 'Reduce Indoor Sources', co2: 760, pmIndoor: 38, pmOutdoor: 6, temp: 72, rh: 46 },
-  cooking: { name: 'Cooking Indoors (2 alerts)', co2: 1250, pmIndoor: 42, pmOutdoor: 7, temp: 75, rh: 52 },
-  fair: { name: 'Fair Air (Moderate, no alerts)', co2: 980, pmIndoor: 20, pmOutdoor: 18, temp: 79, rh: 66 },
-  good: { name: 'All Good', co2: 720, pmIndoor: 7, pmOutdoor: 5, temp: 72, rh: 46 },
+  ventilate: { name: 'Ventilate Now', co2: 1350, pmIndoor: 8, pmOutdoor: 5, temp: 72, rh: 28 },
+  closed: { name: 'Keep Windows Closed', co2: 720, pmIndoor: 20, pmOutdoor: 63, temp: 72, rh: 28 },
+  indoor: { name: 'Ventilate and Check Indoor Sources', co2: 760, pmIndoor: 38, pmOutdoor: 6, temp: 72, rh: 28 },
+  cooking: { name: 'Cooking Indoors (2 alerts)', co2: 1250, pmIndoor: 42, pmOutdoor: 7, temp: 75, rh: 28 },
+  fair: { name: 'Fair Air (Moderate, no alerts)', co2: 720, pmIndoor: 8, pmOutdoor: 20, temp: 74, rh: 28 },
+  good: { name: 'All Good', co2: 720, pmIndoor: 7, pmOutdoor: 5, temp: 72, rh: 28 },
 };
 
 const jitter = (value, pct) => value * (1 + (Math.random() * 2 - 1) * pct);
