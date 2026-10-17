@@ -5,6 +5,7 @@ import { CloudIcon, LeafBadge, ParticlesIcon, SunIcon, WarningBadge } from '../c
 import { Card, Header, InfoBox, Pill, Screen } from '../components/ui';
 import {
   evaluate,
+  formatValue,
   INDOOR_ACTIONS,
   INDOOR_SOURCES_TEXT,
   LEVEL_LABEL,
@@ -18,12 +19,12 @@ import { useSettings } from '../state/SettingsContext';
 import { cardShadow, colors, palettes } from '../theme';
 
 
-function MetricTile({ label, value, unit, level, icon }) {
+function MetricTile({ metric, label, value, unit, level, icon }) {
   return (
     <Card style={styles.tile}>
       <View style={styles.tileIcon}>{icon}</View>
       <Text style={styles.tileLabel}>{label}</Text>
-      <Text style={styles.tileValue}>{value.toLocaleString('en-US')}</Text>
+      <Text style={styles.tileValue}>{formatValue(metric, value)}</Text>
       <Text style={styles.tileUnit}>{unit}</Text>
       <Pill label={LEVEL_LABEL[level]} palette={level} style={{ marginTop: 8 }} />
     </Card>
@@ -76,6 +77,7 @@ export default function SuggestionScreen({ navigation, route }) {
 
       <View style={styles.tiles}>
         <MetricTile
+          metric="co2"
           label={METRICS.co2.label}
           value={data.co2}
           unit={METRICS.co2.unit}
@@ -83,6 +85,7 @@ export default function SuggestionScreen({ navigation, route }) {
           icon={<CloudIcon size={44} />}
         />
         <MetricTile
+          metric="pmIndoor"
           label={METRICS.pmIndoor.label}
           value={data.pmIndoor}
           unit={METRICS.pmIndoor.unit}
@@ -90,6 +93,7 @@ export default function SuggestionScreen({ navigation, route }) {
           icon={<ParticlesIcon size={34} />}
         />
         <MetricTile
+          metric="pmOutdoor"
           label={METRICS.pmOutdoor.label}
           value={data.pmOutdoor}
           unit={METRICS.pmOutdoor.unit}

@@ -1,5 +1,8 @@
-// Simulated history series. Deterministic (seeded) so charts look the same on every launch.
-// Replace generateSeries() with a real fetch when sensors are connected.
+// Chart data, from two sources:
+//   toSeries()       - real samples read from Firebase, resampled onto the grid
+//   generateSeries() - the deterministic (seeded) simulation, used in demo mode
+// Both hand the chart a fixed-length array per metric, where null means "no
+// reading in this bucket" so gaps in a real feed draw as gaps.
 
 function rng(seed) {
   let s = seed | 0;
@@ -46,7 +49,72 @@ export function generateSeries(metric, rangeKey) {
   return out;
 }
 
+export const SERIES_METRICS = ['co2', 'pmIndoor', 'pmOutdoor'];
+
+export const rangeStart = (rangeKey, now = Date.now()) =>
+  now - RANGES[rangeKey].hoursSpan * 60 * 60 * 1000;
+
+// Resamples real samples onto the fixed grid the chart draws, averaging what
+// falls in each bucket and leaving a bucket empty (null) when nothing does.
+// Averaging rather than picking the nearest point keeps a 5-minute feed honest
+// at the 30-day zoom, where one bucket covers three hours.
+export function toSeries(samples, rangeKey, now = Date.now()) {
+  const { points } = RANGES[rangeKey];
+  const from = rangeStart(rangeKey, now);
+  const width = (now - from) / points;
+  const sums = {};
+  const counts = {};
+  SERIES_METRICS.forEach((m) => {
+    sums[m] = new Array(points).fill(0);
+    counts[m] = new Array(points).fill(0);
+  });
+
+  for (const sample of samples) {
+    const slot = Math.floor((sample.at - from) / width);
+    if (slot < 0 || slot >= points) continue;
+    for (const m of SERIES_METRICS) {
+      const value = sample.reading[m];
+      if (typeof value === 'number' && isFinite(value)) {
+        sums[m][slot] += value;
+        counts[m][slot] += 1;
+      }
+    }
+  }
+
+  const out = { from, to: now };
+  for (const m of SERIES_METRICS) {
+    out[m] = sums[m].map((sum, i) => (counts[m][i] ? sum / counts[m][i] : null));
+  }
+  return out;
+}
+
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const HOUR_LABEL = (d) => {
+  const h = d.getHours();
+  return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+// Labels for a window that ends now, which is what the live charts plot.
+// xLabelsFor() below assumes the simulated 24h series starts at midnight, so
+// it cannot be reused here.
+export function rollingXLabels(rangeKey, now = Date.now()) {
+  const from = rangeStart(rangeKey, now);
+  const at = (pos) => new Date(from + pos * (now - from));
+  if (rangeKey === '24h') {
+    return [0, 0.25, 0.5, 0.75, 1].map((pos) => ({ pos, text: HOUR_LABEL(at(pos)) }));
+  }
+  if (rangeKey === '7d') {
+    return Array.from({ length: 7 }, (_, i) => {
+      const pos = i / 6;
+      return { pos, text: DAY_NAMES[at(pos).getDay()] };
+    });
+  }
+  return [0, 0.25, 0.5, 0.75, 1].map((pos) => {
+    const d = at(pos);
+    return { pos, text: `${d.getMonth() + 1}/${d.getDate()}` };
+  });
+}
 
 export function xLabelsFor(rangeKey, now = new Date()) {
   if (rangeKey === '24h') {

@@ -29,7 +29,10 @@ export const ALERT_META = {
 
 // Keeps a log of alert events: one open event per metric while the reading is Unhealthy.
 // Only Unhealthy readings raise an alert. An event closes when the reading is Moderate or Good again.
-const STALE_MS = 10 * 60 * 1000;
+// The node publishes every 5 minutes (PUBLISH_INTERVAL in sen66_aqi.cpp), so
+// this has to tolerate a couple of missed publishes before it decides an open
+// alert went stale and closes it where the reading was last seen.
+const STALE_MS = 20 * 60 * 1000;
 
 export function applyReadings(events, readings, thresholds, now) {
   let changed = false;
@@ -46,7 +49,12 @@ export function applyReadings(events, readings, thresholds, now) {
   for (const metric of ALERT_METRICS) {
     const value = readings[metric];
     const open = next.find((e) => e.metric === metric && e.endedAt == null);
-    if (levelFor(metric, value, thresholds) === 'bad') {
+    const level = levelFor(metric, value, thresholds);
+    // A channel the node did not report is not evidence that the air recovered,
+    // so a dropout leaves an open event alone and the staleness check above
+    // closes it if the gap turns into a real outage.
+    if (level === 'none') continue;
+    if (level === 'bad') {
       if (!open) {
         next.push({
           id: `${metric}-${now}`,
@@ -55,7 +63,7 @@ export function applyReadings(events, readings, thresholds, now) {
           endedAt: null,
           lastSeen: now,
           peak: value,
-          peakLevel: levelFor(metric, value, thresholds),
+          peakLevel: level,
           // All readings at the moment this alert was at its worst, for the past-alert panel.
           peakAt: now,
           snapshot: { ...readings },
@@ -64,7 +72,7 @@ export function applyReadings(events, readings, thresholds, now) {
         open.lastSeen = now;
         if (value > open.peak) {
           open.peak = value;
-          open.peakLevel = levelFor(metric, value, thresholds);
+          open.peakLevel = level;
           open.peakAt = now;
           open.snapshot = { ...readings };
         }
@@ -76,12 +84,10 @@ export function applyReadings(events, readings, thresholds, now) {
     }
   }
 
-  // Past alerts only cover earlier days: an alert that started and ended today is not kept.
-  const today = dayKey(now);
-  const kept = next.filter((e) => !(e.endedAt != null && dayKey(e.startedAt) === today));
-  if (kept.length !== next.length) changed = true;
-
-  return changed ? kept : events;
+  // Resolved alerts are kept whatever day they happened on, including today -
+  // with a real sensor, an alert that cleared this morning is exactly the thing
+  // you want to look back at. The log is capped by MAX_EVENTS, not by age.
+  return changed ? next : events;
 }
 
 // Sample past alerts so the history isn't empty on first launch (sensor data here is simulated).

@@ -11,7 +11,7 @@ import {
   formatDuration,
   formatTime,
 } from '../data/alerts';
-import { LEVEL_LABEL, levelFor } from '../data/levels';
+import { formatValue, LEVEL_LABEL, levelFor, suggestionFor } from '../data/levels';
 import { useAlerts } from '../state/AlertsContext';
 import { SCENARIOS, useSensors } from '../state/SensorContext';
 import { useSettings } from '../state/SettingsContext';
@@ -43,23 +43,27 @@ function CurrentAlert({ event, onOpen }) {
   const meta = ALERT_META[event.metric];
   const now = readings[event.metric];
   const level = levelFor(event.metric, now, settings.thresholds);
-  const palette = palettes[level === 'good' ? event.peakLevel : level];
+  // While the reading is back to Good, or the channel dropped out, the card
+  // keeps the colour of the alert's peak rather than going green mid-alert.
+  const palette = palettes[level === 'good' || level === 'none' ? event.peakLevel : level];
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => onOpen(meta.kind)}
+      onPress={() => onOpen(event)}
       accessibilityRole="button"
       accessibilityLabel={`${meta.title}. ${meta.action}. Tap for details.`}
     >
       <Card style={[styles.alertCard, { borderLeftColor: palette.accent }]}>
         <View style={styles.alertTop}>
           <View style={styles.alertIcon}>
-            <MetricIcon metric={event.metric} level={level === 'good' ? event.peakLevel : level} />
+            <MetricIcon metric={event.metric} level={level === 'good' || level === 'none' ? event.peakLevel : level} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.alertTitle}>{meta.title}</Text>
             <Text style={styles.alertDetail}>
-              {meta.label}: {now.toLocaleString('en-US')} {meta.unit} (Unhealthy above {settings.thresholds[event.metric].moderate})
+              {level === 'none'
+                ? `${meta.label}: no current reading · peak ${formatValue(event.metric, event.peak)} ${meta.unit}`
+                : `${meta.label}: ${formatValue(event.metric, now)} ${meta.unit} (Unhealthy above ${settings.thresholds[event.metric].moderate})`}
             </Text>
             <Text style={styles.alertSince}>Started {formatAgo(event.startedAt)}</Text>
           </View>
@@ -92,7 +96,7 @@ function PastAlert({ event, onOpen }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.pastTitle}>{meta.title}</Text>
           <Text style={styles.pastDetail}>
-            Peak {event.peak.toLocaleString('en-US')} {meta.unit}
+            Peak {formatValue(event.metric, event.peak)} {meta.unit}
           </Text>
           <Text style={styles.pastTime}>
             {range} · {formatDuration(event.endedAt - event.startedAt)}
@@ -105,15 +109,29 @@ function PastAlert({ event, onOpen }) {
   );
 }
 
-function ScenarioModal({ selected, onSelect, onClose }) {
+function SourceModal({ source, scenario, onSelect, onClose }) {
+  const selected = source === 'demo' ? scenario : 'live';
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.sheetTitle}>Simulate a situation</Text>
-          <Text style={styles.sheetHint}>Choose what the simulated sensors report.</Text>
+          <Text style={styles.sheetTitle}>Where readings come from</Text>
+          <Text style={styles.sheetHint}>
+            Use the real node, or simulate a situation to see how the app responds.
+          </Text>
+          <TouchableOpacity style={styles.option} onPress={() => onSelect({ source: 'live' })}>
+            <Text style={[styles.optionText, selected === 'live' && styles.optionSelected]}>
+              Live sensor (AirGuard node)
+            </Text>
+            {selected === 'live' ? <Ionicons name="checkmark" size={22} color={colors.primary} /> : null}
+          </TouchableOpacity>
+          <Text style={styles.sheetGroup}>Simulated</Text>
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <TouchableOpacity key={key} style={styles.option} onPress={() => onSelect(key)}>
+            <TouchableOpacity
+              key={key}
+              style={styles.option}
+              onPress={() => onSelect({ source: 'demo', scenario: key })}
+            >
               <Text style={[styles.optionText, key === selected && styles.optionSelected]}>{s.name}</Text>
               {key === selected ? <Ionicons name="checkmark" size={22} color={colors.primary} /> : null}
             </TouchableOpacity>
@@ -130,7 +148,9 @@ function ScenarioModal({ selected, onSelect, onClose }) {
 export default function AlertsScreen({ navigation }) {
   const { current, past } = useAlerts();
   const { settings, update } = useSettings();
+  const { readings, status } = useSensors();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const live = settings.source !== 'demo';
 
   const groups = useMemo(() => {
     const out = [];
@@ -143,7 +163,13 @@ export default function AlertsScreen({ navigation }) {
     return out;
   }, [past]);
 
-  const openCurrent = (kind) => navigation.navigate('AlertDetail', { kind, backLabel: 'Back to alerts' });
+  // Resolve the advice against the live readings, so a CO₂ alert with no
+  // outdoor reading opens the hedged page rather than claiming the air is clean.
+  const openCurrent = (event) =>
+    navigation.navigate('AlertDetail', {
+      kind: suggestionFor(event.metric, readings, settings.thresholds) || ALERT_META[event.metric].kind,
+      backLabel: 'Back to alerts',
+    });
   const openPast = (event) =>
     navigation.navigate('AlertDetail', {
       kind: ALERT_META[event.metric].kind,
@@ -161,17 +187,27 @@ export default function AlertsScreen({ navigation }) {
       <SectionTitle title="Current alerts" count={current.length} />
       {current.length === 0 ? (
         <Card style={styles.emptyCard}>
-          <Ionicons name="checkmark-circle" size={34} color="#2E9E4B" />
+          <Ionicons
+            name={status === 'ok' || status === 'demo' ? 'checkmark-circle' : 'cloud-offline-outline'}
+            size={34}
+            color={status === 'ok' || status === 'demo' ? '#2E9E4B' : '#7A8AA0'}
+          />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.emptyTitle}>No active alerts</Text>
-            <Text style={styles.emptyText}>No readings are unhealthy right now.</Text>
+            <Text style={styles.emptyTitle}>
+              {status === 'ok' || status === 'demo' ? 'No active alerts' : 'No readings yet'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {status === 'ok' || status === 'demo'
+                ? 'No readings are unhealthy right now.'
+                : 'Waiting for your node to publish. Nothing is being graded yet.'}
+            </Text>
           </View>
         </Card>
       ) : (
         current.map((e) => <CurrentAlert key={e.id} event={e} onOpen={openCurrent} />)
       )}
 
-      <SectionTitle title="Past alerts" count={0} />
+      <SectionTitle title="Past alerts" count={past.length} />
       {groups.length === 0 ? (
         <Card style={styles.emptyCard}>
           <Ionicons name="time-outline" size={30} color="#6B7B93" />
@@ -192,19 +228,26 @@ export default function AlertsScreen({ navigation }) {
       )}
 
       <TouchableOpacity style={styles.demoRow} onPress={() => setPickerOpen(true)} accessibilityRole="button">
-        <Ionicons name="flask" size={18} color="#3F6EA8" />
-        <Text style={styles.demoLabel}>Demo: simulate a situation</Text>
-        <Text style={styles.demoValue}>{(SCENARIOS[settings.scenario] || SCENARIOS.ventilate).name}</Text>
+        <Ionicons name={live ? 'hardware-chip' : 'flask'} size={18} color="#3F6EA8" />
+        <Text style={styles.demoLabel}>Readings source</Text>
+        <Text style={styles.demoValue}>
+          {live ? 'Live sensor' : (SCENARIOS[settings.scenario] || SCENARIOS.ventilate).name}
+        </Text>
         <Ionicons name="chevron-forward" size={16} color="#7A8AA0" />
       </TouchableOpacity>
-      <Text style={styles.footnote}>Sensor readings and past alerts on this device are simulated.</Text>
+      <Text style={styles.footnote}>
+        {live
+          ? 'Alerts are logged on this device from the readings your node publishes.'
+          : 'Sensor readings and past alerts shown here are simulated.'}
+      </Text>
 
       {pickerOpen ? (
-        <ScenarioModal
-          selected={settings.scenario}
+        <SourceModal
+          source={settings.source}
+          scenario={settings.scenario}
           onClose={() => setPickerOpen(false)}
-          onSelect={(k) => {
-            update({ scenario: k });
+          onSelect={(patch) => {
+            update(patch);
             setPickerOpen(false);
           }}
         />
@@ -271,6 +314,14 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: '#fff', borderRadius: 22, padding: 22, ...cardShadow },
   sheetTitle: { fontSize: 20, fontWeight: '700', color: colors.navy },
   sheetHint: { fontSize: 14, color: colors.muted, marginTop: 6, marginBottom: 10 },
+  sheetGroup: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    letterSpacing: 0.6,
+    marginTop: 14,
+    marginBottom: 2,
+  },
   option: {
     flexDirection: 'row',
     justifyContent: 'space-between',

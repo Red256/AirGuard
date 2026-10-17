@@ -5,6 +5,7 @@ import { CloudIcon, DropIcon, ParticlesIcon, SunIcon, ThermometerIcon } from '..
 import { Card, Header, InfoBox, Pill, Screen } from '../components/ui';
 import {
   evaluate,
+  formatValue,
   humidityLabel,
   LEVEL_LABEL,
   levelFor,
@@ -18,9 +19,33 @@ import { useSettings } from '../state/SettingsContext';
 import { colors, palettes } from '../theme';
 
 const GOOD_COPY = {
-  co2: { good: 'Good air level', moderate: 'Getting stuffy', bad: 'Ventilation recommended' },
-  pmIndoor: { good: 'Low level', moderate: 'Slightly raised', bad: 'High level' },
-  pmOutdoor: { good: 'Good air quality', moderate: 'Moderate air quality', bad: 'Poor air quality' },
+  co2: {
+    good: 'Good air level',
+    moderate: 'Getting stuffy',
+    bad: 'Ventilation recommended',
+    none: 'Sensor has not reported this',
+  },
+  pmIndoor: {
+    good: 'Low level',
+    moderate: 'Slightly raised',
+    bad: 'High level',
+    none: 'Sensor has not reported this',
+  },
+  pmOutdoor: {
+    good: 'Good air quality',
+    moderate: 'Moderate air quality',
+    bad: 'Poor air quality',
+    none: 'No outdoor sensor connected',
+  },
+};
+
+// One line under the title about the feed itself, so a blank card is never
+// ambiguous between "the air is fine" and "we are not hearing from the device".
+const FEED_NOTE = {
+  connecting: 'Connecting to your AirGuard node…',
+  empty: 'Connected, but this device has not published any readings yet',
+  error: 'Cannot reach the database — check your connection',
+  demo: 'Simulated demo data, not a real sensor',
 };
 
 function Row({ icon, name, sub, value, unit, pill, onPress, accent }) {
@@ -58,8 +83,9 @@ function Row({ icon, name, sub, value, unit, pill, onPress, accent }) {
 
 export default function ReadingsScreen({ navigation }) {
   const { settings } = useSettings();
-  const { readings, updatedAt } = useSensors();
+  const { readings, updatedAt, status } = useSensors();
   const updated = useRelativeTime(updatedAt);
+  const feedNote = FEED_NOTE[status] || null;
 
   const lv = {
     co2: levelFor('co2', readings.co2, settings.thresholds),
@@ -105,14 +131,17 @@ export default function ReadingsScreen({ navigation }) {
         <Text style={styles.title}>Sensor Readings</Text>
       )}
       <Text style={styles.subtitle}>
-        {anyTappable ? 'Tap a highlighted reading to see what to do' : 'Live data from sensors'}
+        {anyTappable ? 'Tap a highlighted reading to see what to do' : 'Live data from your AirGuard node'}
       </Text>
+      {feedNote ? (
+        <Text style={[styles.feedNote, status === 'error' && styles.feedNoteError]}>{feedNote}</Text>
+      ) : null}
 
       <Row
         icon={<CloudIcon size={38} />}
         name="Indoor CO₂"
         sub={GOOD_COPY.co2[lv.co2]}
-        value={readings.co2.toLocaleString('en-US')}
+        value={formatValue('co2', readings.co2)}
         unit="ppm"
         pill={<Pill label={LEVEL_LABEL[lv.co2]} palette={lv.co2} />}
         {...tapProps('co2')}
@@ -121,7 +150,7 @@ export default function ReadingsScreen({ navigation }) {
         icon={<ParticlesIcon size={36} />}
         name="Indoor PM2.5"
         sub={GOOD_COPY.pmIndoor[lv.pmIndoor]}
-        value={readings.pmIndoor}
+        value={formatValue('pmIndoor', readings.pmIndoor)}
         unit="µg/m³"
         pill={<Pill label={LEVEL_LABEL[lv.pmIndoor]} palette={lv.pmIndoor} />}
         {...tapProps('pmIndoor')}
@@ -130,7 +159,7 @@ export default function ReadingsScreen({ navigation }) {
         icon={<SunIcon size={38} color="#F7B500" />}
         name="Outdoor PM2.5"
         sub={GOOD_COPY.pmOutdoor[lv.pmOutdoor]}
-        value={readings.pmOutdoor}
+        value={formatValue('pmOutdoor', readings.pmOutdoor)}
         unit="µg/m³"
         pill={<Pill label={LEVEL_LABEL[lv.pmOutdoor]} palette={lv.pmOutdoor} />}
         {...tapProps('pmOutdoor')}
@@ -139,7 +168,7 @@ export default function ReadingsScreen({ navigation }) {
         icon={<ThermometerIcon size={36} />}
         name="Temperature"
         sub={temp.note ? `Indoor temperature · ${temp.note}` : 'Indoor temperature'}
-        value={toDisplayTemp(readings.temp, settings.tempUnit)}
+        value={formatValue('temp', toDisplayTemp(readings.temp, settings.tempUnit))}
         unit={settings.tempUnit === 'C' ? '°C' : '°F'}
         pill={<Pill label={temp.label} palette={temp.palette} />}
       />
@@ -147,12 +176,16 @@ export default function ReadingsScreen({ navigation }) {
         icon={<DropIcon size={34} />}
         name="Relative Humidity"
         sub={hum.note ? `Indoor humidity · ${hum.note}` : 'Indoor humidity'}
-        value={readings.rh}
+        value={formatValue('rh', readings.rh)}
         unit="%"
         pill={<Pill label={hum.label} palette={hum.palette} />}
       />
 
-      <InfoBox>Live data from sensors around your home.{'\n'}Values update automatically.</InfoBox>
+      <InfoBox>
+        {status === 'demo'
+          ? 'Simulated readings, for trying the app out.\nSwitch back to the live node on the Alerts tab.'
+          : 'Readings come from your SEN66 node, which publishes every 5 minutes.\nOutdoor PM2.5 needs a second, outdoor sensor.'}
+      </InfoBox>
       <Text style={styles.updated}>Updated: {updated}</Text>
     </Screen>
   );
@@ -166,6 +199,8 @@ const styles = StyleSheet.create({
   learnMore: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 4, marginBottom: 14 },
   learnMoreText: { fontSize: 16, fontWeight: '600', color: colors.primary },
   subtitle: { fontSize: 16, color: colors.muted, marginBottom: 14, marginTop: 2 },
+  feedNote: { fontSize: 13, color: colors.muted, marginTop: -8, marginBottom: 12 },
+  feedNoteError: { color: '#C62828', fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, marginBottom: 10 },
   rowIcon: { width: 40, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
   rowName: { fontSize: 15, fontWeight: '700', color: colors.navy },

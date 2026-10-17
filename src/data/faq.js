@@ -60,7 +60,12 @@ export function getFaqCategories() {
         {
           question: 'Is the data in the app real?',
           answer:
-            'In this preview version, the readings, analytics charts and past alerts are simulated demo data.\n• When AirGuard is connected to real sensors, the same screens will show live readings',
+            'Yes, by default. AirGuard reads the sensor node in your home:\n• A Sensirion SEN66 on a Particle Boron measures the air and publishes every 5 minutes\n• The readings go to a cloud database, and the app reads the newest one\n• Outdoor PM2.5 is the exception: nothing measures it yet, so it shows as No data\n• You can switch to simulated readings on the Alerts tab to see how the app responds to bad air',
+        },
+        {
+          question: 'Why does a reading say "No data"?',
+          answer:
+            'A reading is only shown when the sensor actually reported it:\n• Outdoor PM2.5 has no sensor connected, so it is always No data for now\n• The node leaves out a channel for the first few seconds after it starts up, while that part of the sensor warms up\n• If everything says No data, the app has not heard from your node — check that it is powered and online',
         },
       ],
     },
@@ -134,12 +139,13 @@ export function getFaqCategories() {
         },
         {
           question: 'How often do readings update?',
-          answer: '• About once a minute while the app is open',
+          answer:
+            '• The node measures every second and publishes every 5 minutes\n• The app updates the moment a new reading lands, with no need to refresh\n• "Updated" at the bottom of the Home tab is the age of the reading itself, not of the app',
         },
         {
           question: 'What does the Analytics tab show?',
           answer:
-            '• Charts of indoor CO₂, indoor PM2.5 and outdoor PM2.5\n• Switch between the last 24 hours, 7 days or 30 days\n• Tap the info button on a chart to see what it measures',
+            '• Charts of indoor CO₂, indoor PM2.5 and outdoor PM2.5, built from the readings your node has published\n• Switch between the last 24 hours, 7 days or 30 days\n• A break in a line means the node was offline for that stretch\n• Tap the info button on a chart to see what it measures',
         },
       ],
     },

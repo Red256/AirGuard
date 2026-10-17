@@ -19,6 +19,8 @@ export const palettes = {
   moderate: { bg: '#FDEBD0', title: '#E65100', accent: '#F39C12', pillBg: '#FFE6B3', pillText: '#D98200' },
   bad: { bg: '#FCE2E2', title: '#C62828', accent: '#E53935', pillBg: '#FDE0E0', pillText: '#D32F2F' },
   info: { bg: '#E3F0FB', title: '#1565C0', accent: '#1976D2', pillBg: '#E3F0FB', pillText: '#1976D2' },
+  // No reading for this channel: grey, so it reads as absent rather than as a grade.
+  none: { bg: '#EEF2F7', title: '#5B6B80', accent: '#AFBCCC', pillBg: '#E8EDF3', pillText: '#6B7B93' },
 };
 
 export const cardShadow = {
