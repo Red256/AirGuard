@@ -21,13 +21,19 @@ import { cardShadow, colors } from '../theme';
 // that has not reported yet; an unreachable database is the user's connection.
 const HELP = 'Find this in the Particle console, or on the label on your AirGuard node.';
 
+// Demo convenience: the field starts on the node used for demonstrations so it
+// does not have to be typed on a phone. Registration is unchanged — the id is
+// still checked against the database when Connect is tapped, and it can be
+// edited or cleared. Set this to '' before handing the app to anyone else.
+const DEMO_DEVICE_ID = 'e00fce6893f468b723fe10b0';
+
 // `onDone` is for the "change device" route, where the app is already past the
 // registration gate and has to navigate back itself. On first launch it is
 // omitted: saving the id flips the gate and the tabs mount on their own.
 export default function RegisterDeviceScreen({ onCancel, onDone }) {
   const insets = useSafeAreaInsets();
   const { registerDevice } = useSettings();
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(DEMO_DEVICE_ID);
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState(null);
 
