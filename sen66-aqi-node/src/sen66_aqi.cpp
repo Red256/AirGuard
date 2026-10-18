@@ -93,6 +93,17 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, LED_TYPE);
 const bool  AQI_SMOOTHING_DEFAULT = true;
 const float AQI_EMA_TAU_S = 300.0f;            // seconds; ~5 min
 
+// How often the strip is repainted even when the category has not changed.
+//
+// WS2812Bs have no error detection: each one latches whatever 24 bits reach it
+// and holds them until the next frame. One disturbed frame therefore sticks,
+// and painting only on a category change meant it stuck until the air moved
+// across a band - which can be hours, or never. Repainting on a timer bounds
+// how long a bad frame can survive to this interval.
+//
+// 25 LEDs is 600 bits, ~750 us on the wire at 800 kHz, so this is cheap.
+const uint32_t LED_REFRESH_MS = 5000;
+
 // --- AQI tables ---------------------------------------------------------
 //
 // Sub-index for one pollutant, by linear interpolation inside the band that
@@ -183,6 +194,13 @@ static bool aqiSmoothing = AQI_SMOOTHING_DEFAULT;
 // Smoothed PM concentrations feeding the AQI calculation.
 static float emaPm25 = NAN;
 static float emaPm10 = NAN;
+
+// What the strip is currently showing, and when it was last clocked out.
+// File scope so a brightness change can repaint the same colour.
+static const AqiCategory* shownCategory = nullptr;
+static uint32_t lastPaintAt = 0;
+
+static void paintStrip(const AqiCategory* category);
 
 // Published to the cloud.
 static int cloudAqi = -1;       // smoothed, -1 until the first PM reading
@@ -306,7 +324,16 @@ static int cloudSetBrightness(String arg) {
     }
     ledBrightness = (uint8_t)((pct * 255L) / 100L);
     strip.setBrightness(ledBrightness);
-    strip.show();
+    // Repaint from the category colour instead of re-showing the buffer.
+    // setBrightness() scales the stored bytes in place, so showing the same
+    // buffer again after several changes compounds the rounding loss and
+    // drifts the hue.
+    if (shownCategory != nullptr) {
+        paintStrip(shownCategory);
+        lastPaintAt = millis();
+    } else {
+        strip.show();
+    }
     Log.info("LED brightness %ld %% (%u/255)", pct, ledBrightness);
     return (int)ledBrightness;
 }
@@ -352,9 +379,36 @@ static void updateEma(const SEN66Measurement& m) {
               ? m.pm10p0 : emaPm10 + alpha * (m.pm10p0 - emaPm10);
 }
 
-// Paints the whole strip with the AQI category colour. Redraws only when the
-// category changes, so a steady reading does not re-clock 600 bits every
-// second.
+// Writes one colour to every pixel and clocks it out. Always re-sets the
+// pixel buffer rather than relying on what is already in it: setBrightness()
+// rescales the stored bytes in place, so a buffer that has been through a
+// brightness change is not an exact source for the next frame.
+static void paintStrip(const AqiCategory* category) {
+    for (uint16_t i = 0; i < LED_COUNT; i++) {
+        strip.setPixelColor(i, category->r, category->g, category->b);
+    }
+    strip.show();
+}
+
+// Re-clocks the colour already on the strip once LED_REFRESH_MS has passed.
+// Called from the top of loop() rather than from updateIndicator(), so a bad
+// frame is still corrected while the sensor is not ready or has stopped
+// answering - exactly when nobody is watching the log to notice.
+static void refreshStripIfStale() {
+    if (shownCategory == nullptr) {
+        return;
+    }
+    // millis() wrapping after ~49 days still satisfies this, because the
+    // unsigned subtraction wraps with it.
+    if (millis() - lastPaintAt < LED_REFRESH_MS) {
+        return;
+    }
+    lastPaintAt = millis();
+    paintStrip(shownCategory);
+}
+
+// Paints the whole strip when the AQI category changes. The periodic repaint
+// that corrects a disturbed frame is refreshStripIfStale() above.
 static void updateIndicator(const SEN66Measurement& m) {
     int whichRaw = 0;
     int whichSmooth = 0;
@@ -369,16 +423,12 @@ static void updateIndicator(const SEN66Measurement& m) {
     strncpy(cloudAqiCat, category->label, sizeof(cloudAqiCat) - 1);
     cloudAqiCat[sizeof(cloudAqiCat) - 1] = '\0';
 
-    static const AqiCategory* shown = nullptr;
-    if (category == shown) {
+    if (category == shownCategory) {
         return;
     }
-    shown = category;
-
-    for (uint16_t i = 0; i < LED_COUNT; i++) {
-        strip.setPixelColor(i, category->r, category->g, category->b);
-    }
-    strip.show();
+    shownCategory = category;
+    lastPaintAt = millis();
+    paintStrip(category);
 
     if (displayed < 0) {
         Log.info("AQI indicator: %s", category->label);
@@ -465,10 +515,9 @@ void setup() {
     strip.show();
 
     // Dim white until the first particulate reading lands.
-    for (uint16_t i = 0; i < LED_COUNT; i++) {
-        strip.setPixelColor(i, AQI_UNKNOWN.r, AQI_UNKNOWN.g, AQI_UNKNOWN.b);
-    }
-    strip.show();
+    shownCategory = &AQI_UNKNOWN;
+    lastPaintAt = millis();
+    paintStrip(&AQI_UNKNOWN);
 
     Wire.setSpeed(CLOCK_SPEED_100KHZ);  // SEN66 is a 100 kHz device
     Wire.begin();
@@ -504,6 +553,8 @@ void setup() {
 }
 
 void loop() {
+    refreshStripIfStale();
+
     if (millis() - lastSample < SAMPLE_INTERVAL) {
         return;
     }
