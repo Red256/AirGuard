@@ -30,19 +30,25 @@ const numberOr = (value, fallback = null) => (typeof value === 'number' && isFin
 const cToF = (c) => (c * 9) / 5 + 32;
 
 // Translates one stored sample into the shape the app grades and renders.
-// `pmOutdoor` is null on purpose: the SEN66 is an indoor node and nothing in
-// the feed measures outdoor air, so the app shows it as unavailable instead of
-// inventing a number. Give it a source (a second node, or an outdoor AQ API)
-// and this is the single line that needs to change.
-export function toReading(entry) {
+//
+// `placement` decides which slots the sample fills, because the same SEN66
+// hardware means different things depending on where it is:
+//   indoor  - CO₂ and indoor PM2.5 (outdoor PM2.5 stays null)
+//   outdoor - outdoor PM2.5 only. CO₂ outdoors sits near 420 ppm whatever the
+//             air is doing, so grading it would be noise dressed as a reading.
+// A slot nothing measures stays null rather than 0, so the app can say
+// "No data" instead of inventing a number.
+export function toReading(entry, placement = 'indoor') {
   const r = entry && entry.readings;
   if (!r) return null;
+  const outdoor = placement === 'outdoor';
   const tempC = numberOr(r.tempC);
   const co2 = numberOr(r.co2);
+  const pm25 = numberOr(r.pm25);
   return {
-    co2: co2 == null ? null : Math.round(co2),
-    pmIndoor: numberOr(r.pm25),
-    pmOutdoor: null,
+    co2: outdoor || co2 == null ? null : Math.round(co2),
+    pmIndoor: outdoor ? null : pm25,
+    pmOutdoor: outdoor ? pm25 : null,
     temp: tempC == null ? null : cToF(tempC),
     rh: numberOr(r.rh),
     // Channels the node reports that the main screens do not grade yet.
@@ -89,10 +95,11 @@ export async function lookupDevice(deviceId) {
   };
 }
 
-// Subscribes to the newest sample. Calls back with
-// { reading, at, error } and returns the unsubscribe function.
-export function subscribeLatestReading(deviceId, onUpdate) {
-  const latest = query(ref(db, devicePath(deviceId)), orderByKey(), limitToLast(1));
+// Subscribes to one node's newest sample. `device` is a registered
+// { id, placement }. Calls back with { reading, at, error } and returns the
+// unsubscribe function.
+export function subscribeLatestReading(device, onUpdate) {
+  const latest = query(ref(db, devicePath(device.id)), orderByKey(), limitToLast(1));
   return onValue(
     latest,
     (snapshot) => {
@@ -106,7 +113,7 @@ export function subscribeLatestReading(deviceId, onUpdate) {
         return;
       }
       onUpdate({
-        reading: toReading(newest.value),
+        reading: toReading(newest.value, device.placement),
         at: readingTime(newest.key, newest.value),
         error: null,
       });
@@ -119,9 +126,9 @@ export function subscribeLatestReading(deviceId, onUpdate) {
 // Node keys are epoch seconds as strings; orderByKey() with string bounds is a
 // lexicographic range, which is also chronological while the keys stay the
 // same length (10 digits until 2286).
-export async function fetchRange(deviceId, fromMs, toMs = Date.now()) {
+export async function fetchRange(device, fromMs, toMs = Date.now()) {
   const window = query(
-    ref(db, devicePath(deviceId)),
+    ref(db, devicePath(device.id)),
     orderByKey(),
     startAt(String(Math.floor(fromMs / 1000))),
     endAt(String(Math.floor(toMs / 1000)))
@@ -130,7 +137,7 @@ export async function fetchRange(deviceId, fromMs, toMs = Date.now()) {
   const out = [];
   snapshot.forEach((child) => {
     const value = child.val();
-    const reading = toReading(value);
+    const reading = toReading(value, device.placement);
     if (reading) out.push({ at: readingTime(child.key, value), reading });
   });
   out.sort((a, b) => a.at - b.at);

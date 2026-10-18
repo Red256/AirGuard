@@ -11,6 +11,7 @@ import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import ReadingsScreen from './src/screens/ReadingsScreen';
 import RegisterDeviceScreen from './src/screens/RegisterDeviceScreen';
 import StartScreen from './src/screens/StartScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import SuggestionScreen from './src/screens/SuggestionScreen';
 import { AlertsProvider, useAlerts } from './src/state/AlertsContext';
 import { SensorProvider } from './src/state/SensorContext';
@@ -34,6 +35,14 @@ function HomeStackScreen() {
     <HomeStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <HomeStack.Screen name="Readings" component={ReadingsScreen} />
       <HomeStack.Screen name="Suggestion" component={SuggestionScreen} />
+      <HomeStack.Screen name="Settings" component={SettingsScreen} />
+      {/* Registering from inside the app: the nodes already registered stay as
+          they are until a new id is confirmed, so backing out changes nothing. */}
+      <HomeStack.Screen name="RegisterDevice">
+        {({ navigation }) => (
+          <RegisterDeviceScreen onCancel={() => navigation.goBack()} onDone={() => navigation.goBack()} />
+        )}
+      </HomeStack.Screen>
     </HomeStack.Navigator>
   );
 }
@@ -44,16 +53,6 @@ function AlertsStackScreen() {
     <AlertsStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <AlertsStack.Screen name="AlertsList" component={AlertsScreen} />
       <AlertsStack.Screen name="AlertDetail" component={SuggestionScreen} />
-      {/* Re-registering from inside the app: the current device stays set until
-          a new id is confirmed, so backing out leaves the node connected. */}
-      <AlertsStack.Screen name="RegisterDevice">
-        {({ navigation }) => (
-          <RegisterDeviceScreen
-            onCancel={() => navigation.goBack()}
-            onDone={() => navigation.goBack()}
-          />
-        )}
-      </AlertsStack.Screen>
     </AlertsStack.Navigator>
   );
 }

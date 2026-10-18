@@ -52,27 +52,6 @@ The config values in `src/firebase.js` are committed on purpose. A Firebase web
 config is not a credential: it identifies the project, and access is decided by
 the database rules.
 
-## Device registration
-
-The app shows readings from exactly one node, and it will not show anything
-until that node is registered. There is no demo or simulated mode: every number
-on screen came from hardware.
-
-On first launch the user passes through `StartScreen`, then
-[`RegisterDeviceScreen`](src/screens/RegisterDeviceScreen.js), which asks for
-the Boron's 24-character Particle device id. Before saving it the screen calls
-`lookupDevice()` and refuses an id that has never published, so a typo is caught
-at registration rather than becoming an empty Home tab. The id is stored by
-[`SettingsContext`](src/state/SettingsContext.js) under `settings.deviceId` in
-`AsyncStorage`, so registration happens once per install. `App.js` gates the
-tabs on it.
-
-To point an install at a different node, tap **Registered node** at the bottom
-of the Alerts tab. The current id stays set until a new one is confirmed, so
-backing out of that screen leaves the app connected. Alert history is stored per
-device (`airguard.alerts.v4.<deviceId>`), so swapping nodes never mixes two
-homes' logs together.
-
 ### Stored shape
 
 The webhook writes one child per sample, keyed by the device's epoch-second
@@ -99,13 +78,16 @@ PM2.5 is shown, because nothing measures it yet.
 
 ### Mapping to the app's model
 
-| App | Database | Note |
-|---|---|---|
-| `co2` | `readings.co2` | ppm, rounded |
-| `pmIndoor` | `readings.pm25` | µg/m³ |
-| `pmOutdoor` | — | no source; always `No data` |
-| `temp` | `readings.tempC` | converted to °F |
-| `rh` | `readings.rh` | % |
+Which slot a sample fills depends on the node's placement (see
+[Devices and placement](#devices-and-placement)):
+
+| App | Database | Indoor node | Outdoor node |
+|---|---|---|---|
+| `co2` | `readings.co2` | ppm, rounded | `null` |
+| `pmIndoor` | `readings.pm25` | µg/m³ | `null` |
+| `pmOutdoor` | `readings.pm25` | `null` | µg/m³ |
+| `temp` | `readings.tempC` | converted to °F | converted to °F |
+| `rh` | `readings.rh` | % | % |
 
 `pm1`, `pm4`, `pm10`, `voc`, `nox`, `aqi` and `aqiCat` are mapped through but not
 yet graded or charted.
@@ -131,11 +113,65 @@ closed to everything except the webhook's secret looks like:
 The webhook then needs a database secret or a service account to write, set in
 the Particle integration rather than in the rules.
 
+## Devices and placement
+
+The app shows nothing until at least one node is registered. There is no demo
+or simulated mode: every number on screen came from hardware.
+
+Each registered node carries a **placement**, which decides what it
+contributes — the same SEN66 means different things depending on where it is:
+
+| Placement | Supplies | Why not the rest |
+|---|---|---|
+| `indoor` | CO₂, indoor PM2.5, temperature, humidity | — |
+| `outdoor` | outdoor PM2.5, temperature, humidity | outdoor CO₂ sits near 420 ppm whatever the air is doing, so grading it would be noise dressed as a reading |
+
+Readings from every node are folded into one set by
+[`mergeReadings()`](src/data/placement.js): each placement fills only its own
+slots, and where both could answer (temperature, humidity) the indoor node
+wins, because that is the air you are sitting in. A slot no node supplies stays
+null and renders as "No data". `mergeReadings` is plain data logic, kept out of
+`SensorContext` so `npm run verify` can exercise it.
+
+With one indoor node, outdoor PM2.5 is unknown and ventilation advice stays
+hedged (`ventilateUnchecked`). Register an outdoor node too and the full
+indoor-versus-outdoor logic applies.
+
+### Registering
+
+On first launch the user passes through `StartScreen`, then
+[`RegisterDeviceScreen`](src/screens/RegisterDeviceScreen.js), which asks for
+the Boron's 24-character Particle device id and its placement. Before saving it
+the screen calls `lookupDevice()` and refuses an id that has never published,
+so a typo is caught at registration rather than becoming an empty Home tab.
+Registering an id that is already registered moves it to the new placement
+instead of listing the same node twice.
+
+Nodes live in [`SettingsContext`](src/state/SettingsContext.js) as
+`settings.devices` — `[{ id, placement }]` in `AsyncStorage`. An install from
+before placement existed stored a single `deviceId` string; it is read forward
+as one indoor node. `App.js` gates the tabs on there being at least one node.
+
+### Managing them
+
+The gear at the top right of the **My Air** tab opens
+[`SettingsScreen`](src/screens/SettingsScreen.js), which lists every registered
+node and lets you switch its placement between indoor and outdoor, unregister
+it, or register another. Unregistering the last node returns the app to the
+registration gate.
+
+Alert history is one log for the install (`airguard.alerts.v5`) rather than one
+per node: readings are merged from several devices, so an alert belongs to the
+home, and keying it per device would split one alert's history across whichever
+nodes happened to see it.
+
 ## Known gaps
 
-- **Outdoor PM2.5 has no sensor.** Until one exists, a high CO₂ reading opens the
-  hedged "Ventilate If You Can" page rather than claiming the air outside is
-  clean. Giving it a source is one line in `toReading()`.
+- **Outdoor PM2.5 needs a second node.** With only an indoor node registered, a
+  high CO₂ reading opens the hedged "Ventilate If You Can" page rather than
+  claiming the air outside is clean. Register a node with `outdoor` placement
+  and the full comparison applies; there is still no public-API fallback for
+  installs with one node.
 - **Thresholds differ between the app and the firmware.** The app's PM2.5 "Good"
   ceiling is 12 µg/m³ (`src/data/levels.js`); the firmware's LED uses the EPA's
   2024 table, where Good ends at 9.0. The same air can be green on the strip and

@@ -18,14 +18,32 @@ export function Screen({ children }) {
   );
 }
 
-export function Header() {
+// `action` fills the space to the right of the brand, which the header has
+// always reserved. Screens that have nothing to put there pass nothing.
+export function Header({ action }) {
   return (
     <View style={styles.header}>
       <View style={styles.brand}>
         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel="AirGuard logo" />
         <Text style={styles.brandText}>AirGuard</Text>
       </View>
+      {action || null}
     </View>
+  );
+}
+
+// The gear that opens Settings from a tab's own header.
+export function HeaderIconButton({ icon, onPress, label }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={10}
+      style={styles.headerIconButton}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Ionicons name={icon} size={24} color={colors.navy} />
+    </TouchableOpacity>
   );
 }
 
@@ -79,6 +97,14 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center' },
   logo: { width: 48, height: 48 },
   brandText: { fontSize: 26, fontWeight: '700', color: colors.navy, marginLeft: 8 },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6EEF6',
+  },
   hazard: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: 'center', flexShrink: 0 },
   pillText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },

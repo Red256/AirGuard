@@ -1,52 +1,81 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeLatestReading } from '../data/deviceFeed';
+import { mergeReadings, NO_READINGS } from '../data/placement';
 import { useSettings } from './SettingsContext';
 
-// Nothing has been read yet. Every channel is 'No data' rather than zero.
-const NO_READINGS = { co2: null, pmIndoor: null, pmOutdoor: null, temp: null, rh: null };
+const UNREGISTERED = {
+  readings: NO_READINGS,
+  updatedAt: null,
+  status: 'unregistered',
+  error: null,
+};
 
 const SensorContext = createContext(null);
 
-const UNREGISTERED = { readings: NO_READINGS, updatedAt: null, status: 'unregistered', error: null };
-
 export function SensorProvider({ children }) {
-  const { settings } = useSettings();
-  const deviceId = settings.deviceId;
+  const { devices } = useSettings();
+  // Re-subscribe only when the set of nodes or their placements actually
+  // change, not on every settings write.
+  const key = devices.map((d) => `${d.id}:${d.placement}`).join(',');
 
-  // `status` is what the UI tells the user about the feed itself:
-  //   unregistered - no device registered yet, so there is nothing to read
-  //   connecting   - waiting for the first snapshot
-  //   ok           - showing a real sample
-  //   empty        - connected, but the device has never published
-  //   error        - permission denied / offline / malformed sample
-  const [state, setState] = useState(() =>
-    deviceId ? { readings: NO_READINGS, updatedAt: null, status: 'connecting', error: null } : UNREGISTERED
-  );
+  const [per, setPer] = useState({});
+  const [errored, setErrored] = useState({});
+  const perRef = useRef(per);
+  perRef.current = per;
 
   useEffect(() => {
-    if (!deviceId) {
-      setState(UNREGISTERED);
-      return undefined;
+    setPer({});
+    setErrored({});
+    if (devices.length === 0) return undefined;
+
+    const unsubscribes = devices.map((device) =>
+      subscribeLatestReading(device, ({ reading, at, error }) => {
+        if (error) {
+          setErrored((prev) => ({ ...prev, [device.id]: error }));
+          return;
+        }
+        setErrored((prev) => {
+          if (!prev[device.id]) return prev;
+          const next = { ...prev };
+          delete next[device.id];
+          return next;
+        });
+        setPer((prev) => ({ ...prev, [device.id]: { reading, at, placement: device.placement } }));
+      })
+    );
+    return () => unsubscribes.forEach((off) => off && off());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const value = useMemo(() => {
+    if (devices.length === 0) {
+      return { ...UNREGISTERED, devices, sources: {} };
     }
+    const { readings, updatedAt, sources } = mergeReadings(devices, per);
+    const answered = devices.filter((d) => per[d.id]);
+    const errors = devices.filter((d) => errored[d.id]);
 
-    // Blank the cards while attaching to a different device, so one node's
-    // readings are never shown under another node's id.
-    setState({ readings: NO_READINGS, updatedAt: null, status: 'connecting', error: null });
+    // `status` is what the UI tells the user about the feed itself:
+    //   unregistered - no node registered, so there is nothing to read
+    //   connecting   - waiting for the first snapshot
+    //   ok           - showing at least one real sample
+    //   empty        - connected, but no node has ever published
+    //   error        - every node failed (permission denied / offline)
+    let status = 'connecting';
+    if (updatedAt != null) status = 'ok';
+    else if (errors.length === devices.length) status = 'error';
+    else if (answered.length === devices.length) status = 'empty';
 
-    return subscribeLatestReading(deviceId, ({ reading, at, error }) => {
-      if (error) {
-        setState((prev) => ({ ...prev, status: 'error', error }));
-        return;
-      }
-      if (!reading) {
-        setState({ readings: NO_READINGS, updatedAt: null, status: 'empty', error: null });
-        return;
-      }
-      setState({ readings: reading, updatedAt: at, status: 'ok', error: null });
-    });
-  }, [deviceId]);
+    return {
+      readings,
+      updatedAt,
+      status,
+      error: errors.length ? errored[errors[0].id] : null,
+      devices,
+      sources,
+    };
+  }, [devices, per, errored]);
 
-  const value = useMemo(() => state, [state]);
   return <SensorContext.Provider value={value}>{children}</SensorContext.Provider>;
 }
 

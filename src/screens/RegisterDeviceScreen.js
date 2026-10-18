@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isValidDeviceId, lookupDevice, normalizeDeviceId } from '../data/deviceFeed';
-import { useSettings } from '../state/SettingsContext';
+import { PLACEMENT_LABEL, PLACEMENTS, useSettings } from '../state/SettingsContext';
 import { cardShadow, colors } from '../theme';
 
 // Registration has four outcomes, and they need different words. A malformed
@@ -32,8 +32,9 @@ const DEMO_DEVICE_ID = 'e00fce6893f468b723fe10b0';
 // omitted: saving the id flips the gate and the tabs mount on their own.
 export default function RegisterDeviceScreen({ onCancel, onDone }) {
   const insets = useSafeAreaInsets();
-  const { registerDevice } = useSettings();
+  const { devices, addDevice } = useSettings();
   const [input, setInput] = useState(DEMO_DEVICE_ID);
+  const [placement, setPlacement] = useState('indoor');
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState(null);
 
@@ -49,6 +50,14 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
       });
       return;
     }
+    const already = devices.find((d) => d.id === id);
+    if (already && already.placement === placement) {
+      setProblem({
+        kind: 'duplicate',
+        text: `This node is already registered as ${PLACEMENT_LABEL[already.placement].toLowerCase()}.`,
+      });
+      return;
+    }
     setChecking(true);
     try {
       const { found } = await lookupDevice(id);
@@ -61,7 +70,7 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
       }
       // Registering is the last step, so the first screen after this already
       // has a device to subscribe to.
-      registerDevice(id);
+      addDevice(id, placement);
       if (onDone) onDone();
     } catch (e) {
       setProblem({
@@ -114,6 +123,38 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
         />
         <Text style={styles.hint}>
           {id.length > 0 && !wellFormed ? `${id.length} of 24 characters` : HELP}
+        </Text>
+
+        <Text style={[styles.label, styles.labelSpaced]}>Where is this node?</Text>
+        <View style={styles.segmented}>
+          {PLACEMENTS.map((p) => {
+            const active = p === placement;
+            return (
+              <TouchableOpacity
+                key={p}
+                style={[styles.segment, active && styles.segmentActive]}
+                onPress={() => setPlacement(p)}
+                disabled={checking}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={PLACEMENT_LABEL[p]}
+              >
+                <Ionicons
+                  name={p === 'indoor' ? 'home' : 'partly-sunny'}
+                  size={16}
+                  color={active ? '#FFFFFF' : colors.muted}
+                />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  {PLACEMENT_LABEL[p]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.hint}>
+          {placement === 'indoor'
+            ? 'Supplies CO₂ and indoor PM2.5.'
+            : 'Supplies outdoor PM2.5. CO₂ is not graded outdoors.'}
         </Text>
 
         {problem ? (
@@ -170,6 +211,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.navy },
   body: { fontSize: 16, lineHeight: 23, color: colors.muted, marginTop: 8, marginBottom: 26 },
   label: { fontSize: 14, fontWeight: '700', color: colors.navy, marginBottom: 6 },
+  labelSpaced: { marginTop: 20 },
+  segmented: { flexDirection: 'row', backgroundColor: '#E6EEF6', borderRadius: 10, padding: 3 },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { fontSize: 15, fontWeight: '600', color: colors.muted, marginLeft: 6 },
+  segmentTextActive: { color: '#FFFFFF' },
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,

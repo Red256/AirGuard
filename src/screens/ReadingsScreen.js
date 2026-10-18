@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { CloudIcon, DropIcon, ParticlesIcon, SunIcon, ThermometerIcon, WarningBadge } from '../components/Icons';
-import { Card, Header, Pill, Screen } from '../components/ui';
+import { Card, Header, HeaderIconButton, Pill, Screen } from '../components/ui';
 import {
   formatValue,
   LEVEL_LABEL,
@@ -105,9 +105,16 @@ function Row({ icon, name, sub, value, unit, unitBeside, pill, onPress }) {
 
 export default function ReadingsScreen({ navigation }) {
   const { settings } = useSettings();
-  const { readings, updatedAt, status } = useSensors();
+  const { readings, updatedAt, status, sources } = useSensors();
   const updated = useRelativeTime(updatedAt);
   const feedNote = FEED_NOTE[status] || null;
+
+  // Temperature and humidity can come from either side, so the subtitle says
+  // which, rather than claiming "indoor" for a reading taken outside.
+  const whereFrom = (slot) => {
+    const place = sources && sources[slot] && sources[slot].placement;
+    return place === 'outdoor' ? 'Outdoor' : 'Indoor';
+  };
 
   const lv = {
     co2: levelFor('co2', readings.co2, settings.thresholds),
@@ -132,7 +139,15 @@ export default function ReadingsScreen({ navigation }) {
 
   return (
     <Screen>
-      <Header />
+      <Header
+        action={
+          <HeaderIconButton
+            icon="settings-outline"
+            label="Settings"
+            onPress={() => navigation.navigate('Settings')}
+          />
+        }
+      />
       {alertKinds.length > 0 ? (
         alertKinds.map((kind) => (
           <AlertBanner key={kind} kind={kind} onLearnMore={() => navigation.navigate('Suggestion', { kind })} />
@@ -178,7 +193,7 @@ export default function ReadingsScreen({ navigation }) {
       <Row
         icon={<ThermometerIcon size={36} />}
         name="Temperature"
-        sub="Indoor temperature"
+        sub={`${whereFrom('temp')} temperature`}
         value={formatValue('temp', toDisplayTemp(readings.temp, settings.tempUnit))}
         unit={settings.tempUnit === 'C' ? '°C' : '°F'}
         unitBeside
@@ -186,7 +201,7 @@ export default function ReadingsScreen({ navigation }) {
       <Row
         icon={<DropIcon size={34} />}
         name="Humidity"
-        sub="Indoor humidity"
+        sub={`${whereFrom('rh')} humidity`}
         value={formatValue('rh', readings.rh)}
         unit="%"
         unitBeside

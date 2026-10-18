@@ -4,32 +4,26 @@ import { applyReadings } from '../data/alerts';
 import { useSensors } from './SensorContext';
 import { useSettings } from './SettingsContext';
 
-// One log per registered device, so swapping nodes never mixes two homes'
-// alert histories together.
-const STORAGE_KEY = 'airguard.alerts.v4';
-const storageKeyFor = (deviceId) => `${STORAGE_KEY}.${deviceId}`;
+// One log for the install. Readings are now merged from several nodes, so an
+// alert belongs to the home rather than to any single device; keying it per
+// device would split one alert's history across the nodes that saw it.
+const STORAGE_KEY = 'airguard.alerts.v5';
 const MAX_EVENTS = 100;
 
 const AlertsContext = createContext({ current: [], past: [] });
 
 export function AlertsProvider({ children }) {
-  const { settings } = useSettings();
+  const { settings, registered } = useSettings();
   const { readings, updatedAt, status } = useSensors();
-  const deviceId = settings.deviceId;
   const [events, setEvents] = useState([]);
-  const [loadedDevice, setLoadedDevice] = useState(null);
+  const [loaded, setLoaded] = useState(false);
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
   useEffect(() => {
-    if (!deviceId) {
-      setEvents([]);
-      setLoadedDevice(null);
-      return undefined;
-    }
     let cancelled = false;
     (async () => {
-      const key = storageKeyFor(deviceId);
+      const key = STORAGE_KEY;
       let initial = null;
       try {
         const raw = await AsyncStorage.getItem(key);
@@ -42,16 +36,16 @@ export function AlertsProvider({ children }) {
       if (!Array.isArray(initial)) initial = [];
       if (cancelled) return;
       setEvents(initial);
-      setLoadedDevice(deviceId);
+      setLoaded(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [deviceId]);
+  }, []);
 
   // Open, update or close alert events whenever a new reading arrives.
   useEffect(() => {
-    if (!deviceId || loadedDevice !== deviceId) return;
+    if (!loaded || !registered) return;
     // No timestamp means no sample has landed yet; there is nothing to grade.
     if (updatedAt == null || status === 'error') return;
     const next = applyReadings(eventsRef.current, readings, settings.thresholds, updatedAt);
@@ -61,9 +55,9 @@ export function AlertsProvider({ children }) {
         .sort((a, b) => b.startedAt - a.startedAt)
         .slice(0, MAX_EVENTS);
       setEvents(trimmed);
-      AsyncStorage.setItem(storageKeyFor(deviceId), JSON.stringify(trimmed)).catch(() => {});
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed)).catch(() => {});
     }
-  }, [loadedDevice, deviceId, readings, updatedAt, status, settings.thresholds]);
+  }, [loaded, registered, readings, updatedAt, status, settings.thresholds]);
 
   const value = useMemo(() => {
     const sorted = events.slice().sort((a, b) => b.startedAt - a.startedAt);

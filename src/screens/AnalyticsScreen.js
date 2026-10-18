@@ -20,22 +20,30 @@ function EmptyChart({ text }) {
 }
 
 export default function AnalyticsScreen() {
-  const { settings } = useSettings();
-  const deviceId = settings.deviceId;
+  const { devices } = useSettings();
+  // Re-fetch when the set of nodes or their placements change, not on every
+  // settings write.
+  const devicesKey = devices.map((d) => `${d.id}:${d.placement}`).join(',');
   const [range, setRange] = useState('24h');
   const [history, setHistory] = useState({ state: 'loading', series: null, error: null });
 
   const load = useCallback(async () => {
-    if (!deviceId) return;
+    if (devices.length === 0) return;
     setHistory({ state: 'loading', series: null, error: null });
     try {
       const now = Date.now();
-      const samples = await fetchRange(deviceId, rangeStart(range, now), now);
+      const from = rangeStart(range, now);
+      // One read per node. Each node's samples only carry the metrics its
+      // placement supplies, and toSeries() averages per metric ignoring nulls,
+      // so concatenating the lists merges indoor and outdoor into one chart set.
+      const perDevice = await Promise.all(devices.map((d) => fetchRange(d, from, now)));
+      const samples = perDevice.flat().sort((a, b) => a.at - b.at);
       setHistory({ state: 'ready', series: toSeries(samples, range, now), error: null, count: samples.length });
     } catch (error) {
       setHistory({ state: 'error', series: null, error });
     }
-  }, [deviceId, range]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devicesKey, range]);
 
   useEffect(() => {
     load();

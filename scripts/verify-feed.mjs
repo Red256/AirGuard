@@ -55,6 +55,7 @@ const feed = load('src/data/deviceFeed.js');
 const history = load('src/data/history.js');
 const levels = load('src/data/levels.js');
 const alerts = load('src/data/alerts.js');
+const placement = load('src/data/placement.js');
 
 const raw = SCRATCH
   ? JSON.parse(fs.readFileSync(SCRATCH, 'utf8'))
@@ -79,7 +80,7 @@ const last = samples[samples.length - 1];
 console.log('  newest:', new Date(last.at).toISOString(), JSON.stringify(last.reading));
 check('every sample mapped', samples.length === Object.keys(raw).length);
 check('co2 is a rounded number', samples.every((s) => s.reading.co2 === null || Number.isInteger(s.reading.co2)));
-check('pmOutdoor always null (no source)', samples.every((s) => s.reading.pmOutdoor === null));
+check('an indoor node never claims outdoor air', samples.every((s) => s.reading.pmOutdoor === null));
 check('temp converted C->F into a plausible indoor range',
   samples.every((s) => s.reading.temp === null || (s.reading.temp > 40 && s.reading.temp < 110)),
   `min ${Math.min(...samples.map(s => s.reading.temp))} max ${Math.max(...samples.map(s => s.reading.temp))}`);
@@ -105,6 +106,37 @@ check('known clean outdoor air -> plain ventilate',
   levels.suggestionFor('co2', { co2: 1500, pmIndoor: 2, pmOutdoor: 4 }) === 'ventilate');
 check('unhealthy outdoor still wins',
   levels.suggestionFor('co2', { co2: 1500, pmIndoor: 2, pmOutdoor: 80 }) === 'closed');
+
+console.log('\n== placement ==');
+const rawEntry = Object.values(raw).find((v) => v && v.readings && typeof v.readings.pm25 === 'number');
+const asIndoor = feed.toReading(rawEntry, 'indoor');
+const asOutdoor = feed.toReading(rawEntry, 'outdoor');
+console.log(`  pm25 ${rawEntry.readings.pm25} -> indoor ${asIndoor.pmIndoor} / outdoor ${asOutdoor.pmOutdoor}`);
+check('indoor placement fills pmIndoor', asIndoor.pmIndoor === rawEntry.readings.pm25 && asIndoor.pmOutdoor === null);
+check('outdoor placement fills pmOutdoor', asOutdoor.pmOutdoor === rawEntry.readings.pm25 && asOutdoor.pmIndoor === null);
+check('co2 is not graded outdoors', asIndoor.co2 !== null && asOutdoor.co2 === null);
+check('both placements still report temp and rh',
+  asIndoor.temp !== null && asOutdoor.temp !== null && asIndoor.rh !== null && asOutdoor.rh !== null);
+check('placement defaults to indoor', feed.toReading(rawEntry).pmIndoor === asIndoor.pmIndoor);
+
+console.log('\n== merging two nodes ==');
+const IN = { id: 'a'.repeat(24), placement: 'indoor' };
+const OUT = { id: 'b'.repeat(24), placement: 'outdoor' };
+const merged = placement.mergeReadings([IN, OUT], {
+  [IN.id]: { reading: asIndoor, at: 2000, placement: 'indoor' },
+  [OUT.id]: { reading: asOutdoor, at: 3000, placement: 'outdoor' },
+});
+check('indoor node supplies co2 and indoor pm',
+  merged.readings.co2 === asIndoor.co2 && merged.readings.pmIndoor === asIndoor.pmIndoor);
+check('outdoor node supplies outdoor pm', merged.readings.pmOutdoor === asOutdoor.pmOutdoor);
+check('indoor wins for temp', merged.sources.temp.placement === 'indoor');
+check('updatedAt is the newest contributing sample', merged.updatedAt === 3000);
+const outdoorOnly = placement.mergeReadings([OUT], { [OUT.id]: { reading: asOutdoor, at: 1000, placement: 'outdoor' } });
+check('an outdoor-only install has no indoor readings',
+  outdoorOnly.readings.co2 === null && outdoorOnly.readings.pmIndoor === null);
+check('an outdoor-only install still reads outdoor pm', outdoorOnly.readings.pmOutdoor === asOutdoor.pmOutdoor);
+check('outdoor-only falls back to outdoor temp', outdoorOnly.sources.temp.placement === 'outdoor');
+check('an empty install reads nothing', placement.mergeReadings([], {}).updatedAt === null);
 
 console.log('\n== device registration ==');
 check('a real device id is well formed', feed.isValidDeviceId(DEVICE));

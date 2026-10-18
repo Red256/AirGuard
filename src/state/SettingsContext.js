@@ -4,14 +4,37 @@ import { DEFAULT_THRESHOLDS } from '../data/levels';
 
 const STORAGE_KEY = 'airguard.settings.v1';
 
+export const PLACEMENTS = ['indoor', 'outdoor'];
+
+export const PLACEMENT_LABEL = { indoor: 'Indoor', outdoor: 'Outdoor' };
+
 export const DEFAULT_SETTINGS = {
   thresholds: DEFAULT_THRESHOLDS,
   updateSeconds: 60,
-  // The registered node's Particle device id, or null before registration.
-  // Every reading the app shows comes from this one device; there is no
-  // simulated mode, so nothing is displayed until a device is registered.
-  deviceId: null,
+  // Registered nodes, each { id, placement }. Placement decides which readings
+  // a node contributes: an indoor node supplies CO₂ and indoor PM2.5, an
+  // outdoor node supplies outdoor PM2.5. There is no simulated mode, so the
+  // app shows nothing until at least one node is registered.
+  devices: [],
 };
+
+const isPlacement = (value) => PLACEMENTS.includes(value);
+
+// Accepts both shapes storage can hold: the current `devices` array, and the
+// single `deviceId` string written before placement existed. An upgraded
+// install keeps its node and is assumed indoor, which is what it was.
+function readDevices(saved) {
+  if (Array.isArray(saved.devices)) {
+    const byId = new Map();
+    for (const d of saved.devices) {
+      if (!d || typeof d.id !== 'string') continue;
+      byId.set(d.id, { id: d.id, placement: isPlacement(d.placement) ? d.placement : 'indoor' });
+    }
+    return [...byId.values()];
+  }
+  if (typeof saved.deviceId === 'string') return [{ id: saved.deviceId, placement: 'indoor' }];
+  return [];
+}
 
 const SettingsContext = createContext(null);
 
@@ -32,7 +55,7 @@ export function SettingsProvider({ children }) {
             // which no longer exists; dropping them here keeps that dead state
             // from riding along in storage forever.
             updateSeconds: saved.updateSeconds ?? DEFAULT_SETTINGS.updateSeconds,
-            deviceId: typeof saved.deviceId === 'string' ? saved.deviceId : null,
+            devices: readDevices(saved),
             thresholds: DEFAULT_THRESHOLDS,
           });
         }
@@ -51,12 +74,50 @@ export function SettingsProvider({ children }) {
     });
   }, []);
 
-  const registerDevice = useCallback((deviceId) => update({ deviceId }), [update]);
-  const forgetDevice = useCallback(() => update({ deviceId: null }), [update]);
+  const setDevices = useCallback(
+    (fn) => setSettings((prev) => {
+      const next = { ...prev, devices: fn(prev.devices) };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    }),
+    []
+  );
+
+  // Registering an id that is already registered moves it to the new placement
+  // rather than listing the same node twice.
+  const addDevice = useCallback(
+    (id, placement = 'indoor') =>
+      setDevices((devices) => [
+        ...devices.filter((d) => d.id !== id),
+        { id, placement: isPlacement(placement) ? placement : 'indoor' },
+      ]),
+    [setDevices]
+  );
+
+  const removeDevice = useCallback(
+    (id) => setDevices((devices) => devices.filter((d) => d.id !== id)),
+    [setDevices]
+  );
+
+  const setPlacement = useCallback(
+    (id, placement) =>
+      setDevices((devices) =>
+        devices.map((d) => (d.id === id ? { ...d, placement: isPlacement(placement) ? placement : d.placement } : d))
+      ),
+    [setDevices]
+  );
 
   const value = useMemo(
-    () => ({ settings, update, registerDevice, forgetDevice, registered: settings.deviceId != null }),
-    [settings, update, registerDevice, forgetDevice]
+    () => ({
+      settings,
+      update,
+      devices: settings.devices,
+      addDevice,
+      removeDevice,
+      setPlacement,
+      registered: settings.devices.length > 0,
+    }),
+    [settings, update, addDevice, removeDevice, setPlacement]
   );
 
   if (!loaded) return null;

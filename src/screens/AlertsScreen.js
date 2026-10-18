@@ -17,10 +17,6 @@ import { useSensors } from '../state/SensorContext';
 import { useSettings } from '../state/SettingsContext';
 import { cardShadow, colors, palettes } from '../theme';
 
-// A 24-character device id does not fit on the row and is not worth reading in
-// full; the ends are enough to tell two nodes apart.
-const shortDeviceId = (id) => (id && id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id || '—');
-
 
 function MetricIcon({ metric, level, size = 34 }) {
   if (metric === 'co2') return <CloudIcon size={size} />;
@@ -189,23 +185,9 @@ export default function AlertsScreen({ navigation }) {
         ))
       )}
 
-      {/* Which node these alerts were logged from, and a way to point the app
-          at a different one. */}
-      <TouchableOpacity
-        style={styles.deviceRow}
-        onPress={() => navigation.navigate('RegisterDevice')}
-        accessibilityRole="button"
-        accessibilityLabel="Change registered node"
-      >
-        <Ionicons name="hardware-chip" size={18} color="#3F6EA8" />
-        <Text style={styles.deviceLabel}>Registered node</Text>
-        <Text style={styles.deviceValue} numberOfLines={1}>
-          {shortDeviceId(settings.deviceId)}
-        </Text>
-        <Ionicons name="chevron-forward" size={16} color="#7A8AA0" />
-      </TouchableOpacity>
       <Text style={styles.footnote}>
-        Alerts are logged on this device from the readings your node publishes.
+        Alerts are logged on this device from the readings your nodes publish.
+        Manage your nodes in Settings.
       </Text>
 
     </Screen>
@@ -252,16 +234,5 @@ const styles = StyleSheet.create({
   pastDetail: { fontSize: 13, color: colors.text, marginTop: 2 },
   pastTime: { fontSize: 12, color: colors.muted, marginTop: 2 },
   pastHint: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 4 },
-  deviceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EAF1F8',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 16,
-  },
-  deviceLabel: { flex: 1, fontSize: 14, color: colors.text, marginLeft: 8 },
-  deviceValue: { fontSize: 13, color: '#2A5DA8', marginRight: 6 },
   footnote: { textAlign: 'center', fontSize: 12, color: colors.muted, marginTop: 10 },
 });
