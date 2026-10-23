@@ -25,6 +25,15 @@ export const normalizeDeviceId = (input) => String(input || '').trim().toLowerCa
 
 export const isValidDeviceId = (input) => DEVICE_ID_RE.test(normalizeDeviceId(input));
 
+// Pulls a device id out of scanned QR text. A label may hold the bare id, or
+// wrap it in a URL the Particle console produced, so we take the first 24-hex
+// run rather than requiring the whole payload to be the id. Returns null when
+// the code is something else entirely, which the scanner reports as such.
+export function extractDeviceId(text) {
+  const match = String(text || '').match(/[0-9a-fA-F]{24}/);
+  return match ? match[0].toLowerCase() : null;
+}
+
 const numberOr = (value, fallback = null) => (typeof value === 'number' && isFinite(value) ? value : fallback);
 
 const cToF = (c) => (c * 9) / 5 + 32;

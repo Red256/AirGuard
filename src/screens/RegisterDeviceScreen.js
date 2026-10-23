@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import QrScanner from '../components/QrScanner';
 import { isValidDeviceId, lookupDevice, normalizeDeviceId } from '../data/deviceFeed';
 import { PLACEMENT_LABEL, PLACEMENTS, useSettings } from '../state/SettingsContext';
 import { cardShadow, colors } from '../theme';
@@ -19,13 +20,14 @@ import { cardShadow, colors } from '../theme';
 // Registration has four outcomes, and they need different words. A malformed
 // id is a typo; a well-formed id with no data is either the wrong node or one
 // that has not reported yet; an unreachable database is the user's connection.
-const HELP = 'Find this in the Particle console, or on the label on your AirGuard node.';
+// The camera is only wired up in the native builds; on web the scan button
+// would open a modal that cannot read anything, so the field stands alone and
+// the help text does not offer a scan that is not there.
+const CAN_SCAN = Platform.OS === 'ios' || Platform.OS === 'android';
 
-// Demo convenience: the field starts on the node used for demonstrations so it
-// does not have to be typed on a phone. Registration is unchanged — the id is
-// still checked against the database when Connect is tapped, and it can be
-// edited or cleared. Set this to '' before handing the app to anyone else.
-const DEMO_DEVICE_ID = 'e00fce6893f468b723fe10b0';
+const HELP = CAN_SCAN
+  ? 'Scan the QR code on your node, or find the id in the Particle console.'
+  : 'Find this in the Particle console, or on the label on your AirGuard node.';
 
 // `onDone` is for the "change device" route, where the app is already past the
 // registration gate and has to navigate back itself. On first launch it is
@@ -33,10 +35,11 @@ const DEMO_DEVICE_ID = 'e00fce6893f468b723fe10b0';
 export default function RegisterDeviceScreen({ onCancel, onDone }) {
   const insets = useSafeAreaInsets();
   const { devices, addDevice } = useSettings();
-  const [input, setInput] = useState(DEMO_DEVICE_ID);
+  const [input, setInput] = useState('');
   const [placement, setPlacement] = useState('indoor');
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState(null);
+  const [scanning, setScanning] = useState(false);
 
   const id = normalizeDeviceId(input);
   const wellFormed = isValidDeviceId(id);
@@ -82,6 +85,15 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
     }
   };
 
+  // A scan fills the field rather than registering outright: the placement
+  // below it is still the user's to choose, and seeing the id land gives them
+  // something to check against the label.
+  const onScanned = (scannedId) => {
+    setScanning(false);
+    setInput(scannedId);
+    setProblem(null);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
@@ -103,8 +115,9 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
         </Text>
 
         <Text style={styles.label}>Device ID</Text>
+        <View style={styles.inputRow}>
         <TextInput
-          style={[styles.input, problem && styles.inputError]}
+          style={[styles.input, styles.inputFlex, problem && styles.inputError]}
           value={input}
           onChangeText={(t) => {
             setInput(t);
@@ -121,6 +134,18 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
           onSubmitEditing={submit}
           accessibilityLabel="Device ID"
         />
+          {CAN_SCAN ? (
+            <TouchableOpacity
+              style={styles.scanButton}
+              onPress={() => setScanning(true)}
+              disabled={checking}
+              accessibilityRole="button"
+              accessibilityLabel="Scan QR code"
+            >
+              <Ionicons name="qr-code-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <Text style={styles.hint}>
           {id.length > 0 && !wellFormed ? `${id.length} of 24 characters` : HELP}
         </Text>
@@ -192,6 +217,14 @@ export default function RegisterDeviceScreen({ onCancel, onDone }) {
           </TouchableOpacity>
         ) : null}
       </ScrollView>
+
+      {CAN_SCAN ? (
+        <QrScanner
+          visible={scanning}
+          onScanned={onScanned}
+          onClose={() => setScanning(false)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -236,6 +269,19 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   inputError: { borderColor: '#C62828' },
+  inputRow: { flexDirection: 'row', alignItems: 'stretch' },
+  inputFlex: { flex: 1 },
+  scanButton: {
+    width: 54,
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#D4DEE9',
+    borderRadius: 12,
+    ...cardShadow,
+  },
   hint: { fontSize: 13, color: colors.muted, marginTop: 8 },
   problem: {
     flexDirection: 'row',

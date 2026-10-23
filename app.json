@@ -28,7 +28,14 @@
       "favicon": "./assets/logo.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AirGuard uses the camera to scan the QR code on your sensor node.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "icon": "./assets/icon-cloud.png"
   }
