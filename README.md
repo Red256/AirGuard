@@ -6,7 +6,7 @@ AirGuard is a mobile app and sensor system that tracks indoor CO₂, indoor PM2.
 
 ## Demo video
 
-▶️ **[Watch the AirGuard demo on YouTube](https://www.youtube.com/watch?v=qUMVcUxJ-n0)**
+▶️ Watch the AirGuard demo on YouTube: https://www.youtube.com/watch?v=qUMVcUxJ-n0
 
 ## Why it matters
 
@@ -31,38 +31,6 @@ Opening a window fixes stuffy, high-CO₂ air, but it can pull in wildfire smoke
 | Indoor CO₂ | ≤ 800 ppm | ≤ 1200 ppm | > 1200 ppm |
 | Indoor PM2.5 | ≤ 12 µg/m³ | ≤ 35 µg/m³ | > 35 µg/m³ |
 | Outdoor PM2.5 | ≤ 12 µg/m³ | ≤ 35 µg/m³ | > 35 µg/m³ |
-
-## Repository layout
-
-```
-App.js                 app entry point and navigation (tabs + stacks)
-src/
-  screens/             Start, Readings, Suggestion, Alerts, Analytics (Trends), FAQ
-  components/          icons, line chart, shared UI
-  data/                thresholds and levels, alerts, history, FAQ content
-  state/               sensor, alerts and settings context providers
-  theme.js
-assets/                app icons and logo
-sen66-aqi-node/        hardware firmware (Particle Boron + SEN66) — has its own README
-```
-
-## Running the app
-
-Requires [Node.js](https://nodejs.org/) and, on your phone, the [Expo Go](https://expo.dev/go) app (or an emulator).
-
-```bash
-npm install
-npm start          # then scan the QR code with Expo Go
-```
-
-Other targets:
-
-```bash
-npm run android    # build and run on an Android device/emulator
-npm run web        # run in the browser
-```
-
-> **Note:** the app currently runs on **simulated sensor data**. Pick a scenario in the settings (for example "Ventilate Now", "Keep Windows Closed", "Cooking Indoors") to see each behaviour. The simulation lives in `src/state/SensorContext.js`; replace `makeReading()` with a real sensor or API call to use live data.
 
 ## Hardware
 
