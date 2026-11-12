@@ -1,8 +1,6 @@
 # AirGuard
 
-**Know when to open a window, and when to keep it shut.**
-
-AirGuard is a mobile app and sensor system that tracks indoor CO₂, indoor PM2.5 and outdoor PM2.5, then tells you in plain language what to do about it: ventilate, keep windows closed, or look for an indoor source. It includes custom-built hardware (a Sensirion SEN66 on a Particle Boron with an AQI LED strip) and the Expo / React Native app.
+AirGuard is an integrated mobile app and sensor system that monitors indoor CO₂, indoor PM2.5, and outdoor PM2.5 levels, providing clear, actionable recommendations on when to ventilate, keep windows closed, or investigate indoor pollution sources. The system features a custom-built air quality monitor equipped with a Sensirion SEN66 air sensor, a Particle Boron microcontroller, and an LED strip for visual feedback. The companion mobile app is developed using Expo and React Native.
 
 ## Demo video
 
