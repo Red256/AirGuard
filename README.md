@@ -6,7 +6,7 @@ AirGuard is a mobile app and sensor system that tracks indoor CO₂, indoor PM2.
 
 ## Demo video
 
-▶️ Watch the AirGuard demo on YouTube: youtu.be/qUMVcUxJ-n0
+▶️ Watch the AirGuard demo on YouTube: [youtu.be/qUMVcUxJ-n0](https://www.youtube.com/watch?v=qUMVcUxJ-n0)
 
 ## Why it matters
 
