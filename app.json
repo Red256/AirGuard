@@ -6,17 +6,15 @@
     "orientation": "portrait",
     "scheme": "airguard",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.airguard.app",
-      "buildNumber": "1",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "edgeToEdgeEnabled": true,
       "package": "com.airguard.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-cloud.png",
@@ -35,7 +33,8 @@
           "cameraPermission": "AirGuard uses the camera to scan the QR code on your sensor node.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-status-bar"
     ],
     "icon": "./assets/icon-cloud.png"
   }
