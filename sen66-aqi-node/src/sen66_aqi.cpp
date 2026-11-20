@@ -69,7 +69,8 @@ SYSTEM_THREAD(ENABLED);
 
 // --- configuration ------------------------------------------------------
 const uint32_t SAMPLE_INTERVAL = 1000;         // sensor updates at 1 Hz
-const uint32_t PUBLISH_INTERVAL = 5 * 60 * 1000;  // 5 min; mind your data plan
+// const uint32_t PUBLISH_INTERVAL = 5 * 60 * 1000;  // 5 min; mind your data plan
+const uint32_t PUBLISH_INTERVAL = 10 * 1000;  // 5 min; mind your data plan
 const uint32_t WARMUP_MS = 10000;              // skip the first samples
 const size_t WIRE_BUFFER_SIZE = 64;            // >= 48 for serial-number reads
 
